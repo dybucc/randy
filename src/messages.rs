@@ -26,6 +26,16 @@ cowboy-like answer to the user. Make it a short text. Include just your answer a
 Don't include emoji or otherwise non-verbal content."
 });
 
+/// This enum serves as a way of extending the possible errors from the default requests, so as to
+/// smooth the experience of the user.
+#[derive(thiserror::Error, Debug)]
+enum ExtraError {
+    /// This variant refers to a manual time out that has been, for now, hardcoded to allow exitting
+    /// if the no request has any content for more than 10 requests.
+    #[error("{}", style("timed out after multiple requests").bold())]
+    TimedOut,
+}
+
 /// This structure contains one of the fields sent to the POST request to the OpenRouter API for
 /// chat completion.
 #[expect(
@@ -217,6 +227,7 @@ pub(crate) fn process_message(input: RandomResult, api_key: &str, model: &str) -
     let spinner = ProgressBar::new_spinner();
     spinner.set_message("Processing...");
     spinner.enable_steady_tick(Duration::from_millis(50));
+    let mut repeated = 0;
 
     loop {
         let response = agent
@@ -234,7 +245,11 @@ pub(crate) fn process_message(input: RandomResult, api_key: &str, model: &str) -
         if !output.is_empty() {
             spinner.finish_and_clear();
             break Ok(output.to_owned());
+        } else if repeated > 10 {
+            break Err(ExtraError::TimedOut.into());
         }
+
+        repeated += 1;
     }
 }
 

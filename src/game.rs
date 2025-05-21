@@ -94,7 +94,7 @@ fn init_message(term: &Term) -> Result<()> {
 }
 
 fn process_random(range: (usize, usize), input: usize, mut rng: Rng) -> RandomResult {
-    let random = rng.usize(range.0..range.1);
+    let random = rng.usize(range.0..=range.1);
 
     match input {
         _ if input == random => RandomResult::Correct,

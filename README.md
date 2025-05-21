@@ -48,12 +48,6 @@ Everything's in the `--help` command option, though it is also detailed here.
 
 ## Install
 
-### Crates.io
-
-```
-cargo install randyrand
-```
-
 ### Source
 
 ```

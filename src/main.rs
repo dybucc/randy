@@ -17,7 +17,7 @@
     reason = "The dependencies are used in the library crate."
 )]
 
-use randy::init;
+use randyrand::init;
 
 use anyhow::Result;
 

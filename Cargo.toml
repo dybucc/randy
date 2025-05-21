@@ -1,5 +1,5 @@
 [package]
-name = "randy"
+name = "randyrand"
 version = "0.1.0"
 edition = "2021"
 description = "A quick and AI-powered game to guess numbers and get answered by a cowboy."

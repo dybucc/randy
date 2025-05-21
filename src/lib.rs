@@ -3,7 +3,7 @@
 //!
 //! The starting point of the library is the game.rs file, which contains the main game loop.
 
-#![expect(unused, reason = "Temporary allow during development.")]
+// #![expect(unused, reason = "Temporary allow during development.")]
 
 mod game;
 mod input;

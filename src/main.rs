@@ -13,10 +13,6 @@
 
 #![cfg(target_os = "linux")]
 #![expect(
-    clippy::cargo_common_metadata,
-    reason = "The package has not yet been pushed to a remote."
-)]
-#![expect(
     unused_crate_dependencies,
     reason = "The dependencies are used in the library of the same crate."
 )]

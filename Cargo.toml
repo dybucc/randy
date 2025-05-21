@@ -3,7 +3,7 @@ name = "randy"
 version = "0.1.0"
 edition = "2021"
 description = "A quick and AI-powered game to guess numbers and get answered by a cowboy."
-# repository
+repository = "https://github.com/dybucc/randy"
 license-file = "UNLICENSE"
 keywords = [ "game", "cli", "cowboy", "ai", "random" ]
 categories = [ "command-line-utilities", "games" ]

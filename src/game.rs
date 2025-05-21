@@ -57,7 +57,7 @@ pub fn init() -> Result<()> {
     let cli = Cli::parse();
 
     // show the init message
-    init_message(&term);
+    init_message(&term)?;
 
     // prompt for a range of inputs TODO validate inputs
     let range = take_ranged_input(&term);
@@ -76,22 +76,23 @@ pub fn init() -> Result<()> {
             .unwrap_or("deepseek/deepseek-chat-v3-0324:free".to_string()),
     ) {
         Ok(output) => {
-            term.write_line(&format!("{}", style(output).bold()));
+            term.write_line(&format!("{}", style(output).bold()))?;
             Ok(())
         }
         Err(e) => Err(messages::response_error(e)),
     }
 }
 
-fn init_message(term: &Term) {
+fn init_message(term: &Term) -> Result<()> {
     const MSG: &str = "Welcome to the game of randy";
     let msg = style(MSG).bold();
 
-    term.clear_screen();
+    term.clear_screen()?;
     term.set_title("randy");
-    term.hide_cursor();
+    term.hide_cursor()?;
 
-    term.write_line(&format!("{}", msg));
+    term.write_line(&format!("{}", msg))?;
+    Ok(())
 }
 
 fn process_random(range: (usize, usize), input: usize, mut rng: Rng) -> RandomResult {

@@ -17,9 +17,8 @@
     reason = "The dependencies are used in the library crate."
 )]
 
-use randyrand::init;
-
 use anyhow::Result;
+use randyrand::init;
 
 fn main() -> Result<()> {
     init()

@@ -2,6 +2,7 @@ use anyhow::Result;
 use clap::Parser;
 use console::{style, Term};
 use fastrand::Rng;
+use regex::Regex;
 use serde::Deserialize;
 
 use crate::input::{take_input, take_ranged_input};
@@ -49,19 +50,22 @@ pub(crate) enum RandomResult {
 /// This function specifically creates a new interface to the standard output, and a new rng
 /// instance to avoid calling the thread local generator every time the loop runs for another
 /// iteration.
+// TODO add a main loop to all of the logic except the stateful variables for the stdout stream,
+// the rng instance and the command line argument parser
 pub fn init() -> Result<()> {
     let term = Term::stdout();
     let rng = Rng::new();
     let cli = Cli::parse();
+    let ranged_re = Regex::new(r"\A\d+\.\.\d+\z").unwrap();
 
     // show the init message
     init_message(&term)?;
 
-    // prompt for a range of inputs TODO validate inputs
-    let range = take_ranged_input(&term);
+    // prompt for a range of inputs
+    let range = take_ranged_input(&term, ranged_re)?;
 
-    // prompt for an input TODO validate inputs
-    let input = take_input(&term);
+    // prompt for an input
+    let input = take_input(&term, &range)?;
 
     // run the rng within the given range and check the user's input
     let result = process_random(range, input, rng);

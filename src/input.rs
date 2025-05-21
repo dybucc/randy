@@ -1,29 +1,63 @@
+use anyhow::Result;
 use console::{style, Term};
 use dialoguer::theme::ColorfulTheme;
 use dialoguer::Input;
+use regex::Regex;
 
-pub(crate) fn take_input(term: &Term) -> usize {
+pub(crate) fn take_input(term: &Term, range: &(usize, usize)) -> Result<usize> {
     let input: usize = Input::with_theme(&ColorfulTheme::default())
         .with_prompt(format!("{}", style("Input a number").bold()))
-        .interact_text_on(term)
+        .validate_with(|input: &String| -> Result<(), &str> {
+            if input.as_bytes().iter().all(|c| c.is_ascii_digit()) {
+                // unwrap is safe; at this point, the string is knwown to be solely made out of
+                // digits
+                let num: usize = input.parse().unwrap();
+
+                if num >= range.0 && num <= range.1 {
+                    return Ok(());
+                }
+
+                Err("The given input is not within the provided range")
+            } else {
+                Err("The input should be made up of numbers only")
+            }
+        })
+        .interact_text_on(term)?
+        .parse()
+        // unwrap is safe; the input was validated with dialoguer's validate_with() method
         .unwrap();
 
-    input
+    Ok(input)
 }
 
-pub(crate) fn take_ranged_input(term: &Term) -> (usize, usize) {
-    // TODO: validate input
+pub(crate) fn take_ranged_input(term: &Term, re: Regex) -> Result<(usize, usize)> {
     let input: String = Input::with_theme(&ColorfulTheme::default())
         .with_prompt(format!(
             "{}",
             style("Input a range in the format n..m (both inclusive)").bold()
         ))
-        .interact_text_on(term)
-        .unwrap();
+        .validate_with(|s: &String| -> Result<(), &str> {
+            if re.is_match(s) {
+                // unwrap is safe; the two dots are part of the regex that must pass before this is
+                // checked
+                let (start, end) = s.split_at(s.find("..").unwrap());
+                let mut end: String = end.chars().rev().collect();
+                end.truncate(1);
+                let start = start.parse::<usize>();
+                let end = end.parse::<usize>();
 
-    // initially no error handling will be implemented
+                match (start, end) {
+                    (Ok(b), Ok(e)) if b < e => return Ok(()),
+                    (Ok(_), Ok(_)) => return Err("Invalid input; start must be smaller than end"),
+                    _ => return Err("Invalid input; check bounds with usize"),
+                }
+            }
+            Err("Invalid input; input can only be numeric")
+        })
+        .interact_text_on(term)?;
+
     let (start, mut end) = input.split_at(input.find("..").unwrap());
     (_, end) = end.split_at(end.find(|v: char| v.is_numeric()).unwrap());
 
-    (start.parse().unwrap(), end.parse().unwrap())
+    Ok((start.parse().unwrap(), end.parse().unwrap()))
 }

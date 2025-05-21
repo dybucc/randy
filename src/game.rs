@@ -1,3 +1,8 @@
+//! The game module contains the core parts of the game, except for input and request handling.
+//!
+//! It contains the `init()` function to initialize and start the game loop, as well as the game
+//! initialization message, some terminal configuration and the random number processor.
+
 use anyhow::Result;
 use clap::Parser;
 use console::{style, Term};
@@ -8,6 +13,10 @@ use serde::Deserialize;
 use crate::input::{take_input, take_ranged_input};
 use crate::messages::{process_message, response_error};
 
+/// This struct holds information about the application when it comes to the command-line argument
+/// parser of choice, which is clap. It uses the derive attribute and multiple other attributes to
+/// set up the different commands, as that was found to be the simplest way of accomplishing what
+/// was set out to do.
 #[derive(Parser)]
 #[command(name = "randy", version, about)]
 #[command(next_line_help = true)]
@@ -29,18 +38,34 @@ struct Cli {
     model: Option<String>,
 }
 
+/// It makes up one of the fields the request to fetch models from the OpenRouter API requires. This
+/// structure doesn't support all of the mandatory and optional fields because the request is only
+/// interested in the model id.
 #[derive(Deserialize)]
 struct Data {
+    /// This field contains the name to be used on post requests in the model field for OpenRouter
+    /// POST API requests.
     id: String,
 }
 
+/// This structure contains the main form of the response returned by an OpenRouter API request for
+/// the list of all models available for use in the API.
 #[derive(Deserialize)]
 struct ModelResponse {
+    /// This field contains the only part of the response that the OpenRouter API returns on their
+    /// list all models GET request. It is a list of objects that is abstracted as another struct to
+    /// deserialize.
     data: Vec<Data>,
 }
 
+/// This enum holds the variants to the final result of the user, to better transfer between
+/// different parts of the stateful variable that the result of the current game is.
 pub(crate) enum RandomResult {
+    /// If the guess made by the user is correct, this variant will be used to report the status of
+    /// the current game to other parts of the program.
     Correct,
+    /// If the guess made by the user is inccorrect, this variant will be used to report the status
+    /// of the current game to other parts of the program.
     Incorrect,
 }
 
@@ -50,8 +75,17 @@ pub(crate) enum RandomResult {
 /// This function specifically creates a new interface to the standard output, and a new rng
 /// instance to avoid calling the thread local generator every time the loop runs for another
 /// iteration.
+///
+/// # Errors
+///
+/// The function may return any one of the following errors:
+///
+/// - Regex::Error
+/// - io::Error
+/// - dialoguer::Error
+/// - randyrand::ResponseError
 // TODO add a main loop to all of the logic except the stateful variables for the stdout stream,
-// the rng instance and the command line argument parser
+// the rng instance, the command line argument parser and the compiler regular expression
 pub fn init() -> Result<()> {
     let term = Term::stdout();
     let rng = Rng::new();
@@ -85,6 +119,9 @@ pub fn init() -> Result<()> {
     }
 }
 
+/// This function initializes the message to be used at the start of the program, as well as a few
+/// other fallible operations. Among these, the screen is cleared and the cursor is hidden. The
+/// title of the console window is also set to the name of the game.
 fn init_message(term: &Term) -> Result<()> {
     const MSG: &str = "Welcome to the game of randy";
     let msg = style(MSG).bold();
@@ -97,6 +134,9 @@ fn init_message(term: &Term) -> Result<()> {
     Ok(())
 }
 
+/// This functions takes the role of number generator, as it takes both inputs from the user per
+/// game, and both produces the number to be guessed within the given range, and matches the user
+/// input to such number.
 fn process_random(range: (usize, usize), input: usize, mut rng: Rng) -> RandomResult {
     let random = rng.usize(range.0..=range.1);
 
@@ -107,6 +147,10 @@ fn process_random(range: (usize, usize), input: usize, mut rng: Rng) -> RandomRe
 }
 
 fn verify_model(s: &str) -> Result<String, String> {
+/// This function serves as a value parser for the command line argument parser in the `model`
+/// field. It basically makes a request to the OpenRouter API to retrieve the list of available
+/// models to use through their API and checks if the string passed by clap matches any one of the
+/// strings retrieved in the request.
     let request = ureq::get("https://openrouter.ai/api/v1/models").call();
 
     match request {

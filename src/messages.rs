@@ -243,7 +243,7 @@ pub(crate) fn process_message(input: RandomResult, api_key: &str, model: &str) -
 /// means whatever was carried in the body of the faulty response is completely discarded.
 pub(crate) fn response_error(input: Error) -> Error {
     match input.downcast_ref::<ureq::Error>().unwrap() {
-        ureq::Error::StatusCode(s) => match s {
+        ureq::Error::StatusCode(status) => match status {
             400 => ResponseError::BadRequest.into(),
             401 => ResponseError::InvalidCredentials.into(),
             402 => ResponseError::InsufficientCredits.into(),

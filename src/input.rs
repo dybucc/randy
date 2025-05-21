@@ -16,7 +16,11 @@ pub(crate) fn take_input(term: &Term, range: &(usize, usize)) -> Result<usize> {
     let input: usize = Input::with_theme(&ColorfulTheme::default())
         .with_prompt(format!("{}", style("Input a number").bold()))
         .validate_with(|input: &String| -> Result<(), &str> {
-            if input.as_bytes().iter().all(|c| c.is_ascii_digit()) {
+            if input
+                .as_bytes()
+                .iter()
+                .all(|charac| charac.is_ascii_digit())
+            {
                 // unwrap is safe; at this point, the string is knwown to be solely made out of
                 // digits
                 let num: usize = input.parse().unwrap();
@@ -47,18 +51,18 @@ pub(crate) fn take_ranged_input(term: &Term, re: Regex) -> Result<(usize, usize)
             "{}",
             style("Input a range in the format n..m (both inclusive)").bold()
         ))
-        .validate_with(|s: &String| -> Result<(), &str> {
-            if re.is_match(s) {
+        .validate_with(|string: &String| -> Result<(), &str> {
+            if re.is_match(string) {
                 // unwrap is safe; the two dots are part of the regex that must pass before this is
                 // checked
-                let (start, end) = s.split_at(s.find("..").unwrap());
+                let (start, end) = string.split_at(string.find("..").unwrap());
                 let mut end: String = end.chars().rev().collect();
                 end.truncate(1);
                 let start = start.parse::<usize>();
                 let end = end.parse::<usize>();
 
                 match (start, end) {
-                    (Ok(b), Ok(e)) if b < e => return Ok(()),
+                    (Ok(begin), Ok(end)) if begin < end => return Ok(()),
                     (Ok(_), Ok(_)) => return Err("Invalid input; start must be smaller than end"),
                     _ => return Err("Invalid input; check bounds with usize"),
                 }
@@ -68,7 +72,7 @@ pub(crate) fn take_ranged_input(term: &Term, re: Regex) -> Result<(usize, usize)
         .interact_text_on(term)?;
 
     let (start, mut end) = input.split_at(input.find("..").unwrap());
-    (_, end) = end.split_at(end.find(|v: char| v.is_numeric()).unwrap());
+    (_, end) = end.split_at(end.find(|value: char| value.is_numeric()).unwrap());
 
     Ok((start.parse().unwrap(), end.parse().unwrap()))
 }

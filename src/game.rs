@@ -115,7 +115,7 @@ pub fn init() -> Result<()> {
             term.write_line(&format!("{}", style(output).bold()))?;
             Ok(())
         }
-        Err(e) => Err(response_error(e)),
+        Err(err) => Err(response_error(err)),
     }
 }
 
@@ -146,22 +146,22 @@ fn process_random(range: (usize, usize), input: usize, mut rng: Rng) -> RandomRe
     }
 }
 
-fn verify_model(s: &str) -> Result<String, String> {
 /// This function serves as a value parser for the command line argument parser in the `model`
 /// field. It basically makes a request to the OpenRouter API to retrieve the list of available
 /// models to use through their API and checks if the string passed by clap matches any one of the
 /// strings retrieved in the request.
+fn verify_model(string: &str) -> Result<String, String> {
     let request = ureq::get("https://openrouter.ai/api/v1/models").call();
 
     match request {
-        Ok(r) => {
-            let response: ModelResponse = r.into_body().read_json().unwrap();
+        Ok(response) => {
+            let response: ModelResponse = response.into_body().read_json().unwrap();
             let mut output =
                 String::from("The requested model could not be found with the OpenRouter API.");
 
             for Data { id } in response.data {
-                if id == s {
-                    output = s.to_string();
+                if id == string {
+                    output = string.to_string();
                     return Ok(output);
                 }
             }

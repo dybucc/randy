@@ -149,7 +149,7 @@ pub(crate) fn process_message(input: RandomResult, api_key: &str, model: &str) -
         // if the returned response has an empty body, the model is warming up or the system is
         // scaling
         if !output.is_empty() {
-            spinner.finish();
+            spinner.finish_and_clear();
             break Ok(output.to_owned());
         }
     }

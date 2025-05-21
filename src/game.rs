@@ -1,13 +1,11 @@
-use std::{collections::HashMap, sync::LazyLock};
-
 use anyhow::Result;
-use clap::{Arg, Parser};
+use clap::Parser;
 use console::{style, Term};
 use fastrand::Rng;
 use serde::Deserialize;
 
 use crate::input::{take_input, take_ranged_input};
-use crate::messages::{self, process_message};
+use crate::messages::{process_message, response_error};
 
 #[derive(Parser)]
 #[command(name = "randy", version, about)]
@@ -79,7 +77,7 @@ pub fn init() -> Result<()> {
             term.write_line(&format!("{}", style(output).bold()))?;
             Ok(())
         }
-        Err(e) => Err(messages::response_error(e)),
+        Err(e) => Err(response_error(e)),
     }
 }
 

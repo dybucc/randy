@@ -128,7 +128,7 @@ enum Role {
     User,
 }
 
-pub(crate) fn process_message(input: RandomResult, api: &str, model: &str) -> Result<String> {
+pub(crate) fn process_message(input: RandomResult, api_key: &str, model: &str) -> Result<String> {
     let request_body = Request::new(input, model);
     let agent = Agent::new_with_defaults();
     let spinner = ProgressBar::new_spinner();
@@ -138,7 +138,7 @@ pub(crate) fn process_message(input: RandomResult, api: &str, model: &str) -> Re
     loop {
         let response = agent
             .post("https://openrouter.ai/api/v1/chat/completions")
-            .header("Authorization", format!("Bearer {}", api))
+            .header("Authorization", format!("Bearer {}", api_key))
             .send_json(&request_body)?;
 
         // unwraps are safe because at this point there is always a response with the expected json

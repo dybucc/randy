@@ -10,25 +10,25 @@ That's it.
 Read the [instructions] to set up the program, and the [features] to learn about further
 possibilities with the program.
 
-## Instructions <instructions>
+## Instructions
 
-Everything's in the `help` command page, though it is also detailed here.
+Everything's in the `--help` command option, though it is also detailed here.
 
-- You're going to need an API from OpenRouter to use the application. Just go to your API key
+- You're going to need an API key from OpenRouter to use the application. Just go to your API key
   [settings] and generate a new one.
 - The program will read either the environment variable or the command-line argument with the API
   key, prioritising the second if both are present.
   - To specifiy the environment variable, set the following in either one of your shell profile or
     right before the command to run the program:
     ```
-    OPENROUTER_API=<YOUR_API>
+    OPENROUTER_API_KEY=<YOUR_API_KEY>
     ```
   - To specify the argument to the program, run it with the `api-key` option:
     ```
-    randy --api-key <YOUR_API>
+    randy --api-key <YOUR_API_KEY>
     ```
 
-## Features <features>
+## Features
 
 - The program can pick which model to use for the AI answer. The model must be specified through
   either one of the corresponding environment variable or command line argument.

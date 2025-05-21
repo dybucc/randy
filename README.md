@@ -62,7 +62,7 @@ cd randy
 cargo install --no-track --locked --path .
 ```
 
-[instructions]: #instructions
-[features]: #features
+[instructions]: README.md#instructions
+[features]: README.md#features
 [settings]: https://openrouter.ai/settings/keys
 [models]: https://openrouter.ai/models

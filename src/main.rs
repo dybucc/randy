@@ -14,7 +14,7 @@
 #![cfg(target_os = "linux")]
 #![expect(
     unused_crate_dependencies,
-    reason = "The dependencies are used in the library of the same crate."
+    reason = "The dependencies are used in the library crate."
 )]
 
 use randy::init;

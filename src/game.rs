@@ -9,55 +9,30 @@ use serde::Deserialize;
 use crate::input::{take_input, take_ranged_input};
 use crate::messages::{self, process_message};
 
-#[expect(
-    clippy::arbitrary_source_item_ordering,
-    reason = "The JSON schema requires this order."
-)]
-#[derive(Deserialize)]
-struct Architecture {
-    input_modalities: Vec<String>,
-    output_modalities: Vec<String>,
-    tokenizer: String,
-    instruct_type: String,
-}
-
-// TODO finish configuring clap with the desired options
 #[derive(Parser)]
 #[command(name = "randy", version, about)]
 #[command(next_line_help = true)]
 struct Cli {
     /// The OpenRouter API key to provide for the AI-based responses.
     ///
-    /// This argument is only required if the environment variable OPENROUTER_API is not set with
-    /// the corresponding API key. Otherwise, you will have to specify this option.
-    #[arg(long, env = "OPENROUTER_API")]
+    /// This argument is only required if the environment variable OPENROUTER_API_KEY is not set
+    /// with the corresponding API key. Otherwise, you will have to specify this option.
+    #[arg(long)]
+    #[arg(env = "OPENROUTER_API_KEY", value_name = "YOUR_API_KEY")]
     api_key: String,
     /// The model name to produce the response; DeepSeek's V3 by default.
     ///
     /// Models are processed by the string right below their public brand name in their respective
     /// OpenRouter model page. If you want to set it to anything other than the default free model,
     /// you will have to use that name.
-    #[arg(short, long, value_parser = verify_model, requires = "api_key")]
+    #[arg(short, long, requires = "api_key", value_parser = verify_model)]
+    #[arg(env = "OPENROUTER_MODEL", value_name = "MODEL_NAME")]
     model: Option<String>,
 }
 
-#[expect(
-    clippy::arbitrary_source_item_ordering,
-    reason = "The JSON schema requires this order."
-)]
 #[derive(Deserialize)]
 struct Data {
     id: String,
-    name: String,
-    created: f64,
-    description: String,
-    architecture: Architecture,
-    top_provider: TopProvider,
-    pricing: Pricing,
-    context_length: f64,
-    hugging_face_id: String,
-    per_request_limits: HashMap<String, String>,
-    supported_parameters: Vec<String>,
 }
 
 #[derive(Deserialize)]
@@ -65,36 +40,9 @@ struct ModelResponse {
     data: Vec<Data>,
 }
 
-#[expect(
-    clippy::arbitrary_source_item_ordering,
-    reason = "The JSON schema requires this order."
-)]
-#[derive(Deserialize)]
-struct Pricing {
-    prompt: String,
-    completion: String,
-    image: String,
-    request: String,
-    input_cache_read: String,
-    input_cache_write: String,
-    web_search: String,
-    internal_reasoning: String,
-}
-
 pub(crate) enum RandomResult {
     Correct,
     Incorrect,
-}
-
-#[expect(
-    clippy::arbitrary_source_item_ordering,
-    reason = "The JSON schema requires this order."
-)]
-#[derive(Deserialize)]
-struct TopProvider {
-    is_moderated: bool,
-    context_length: f64,
-    max_completion_tokens: f64,
 }
 
 /// Initializes the game state and handles literally everything. This is a `main()` function of
@@ -155,27 +103,27 @@ fn process_random(range: (usize, usize), input: usize, mut rng: Rng) -> RandomRe
     }
 }
 
-fn verify_model(s: &str) -> Result<Option<String>, String> {
-    let cli = Cli::parse();
-
-    let request = ureq::get("https://openrouter.ai/api/v1/models")
-        .header("Authentication", format!("Bearer {}", cli.api_key))
-        .call();
+fn verify_model(s: &str) -> Result<String, String> {
+    let request = ureq::get("https://openrouter.ai/api/v1/models").call();
 
     match request {
         Ok(r) => {
             let response: ModelResponse = r.into_body().read_json().unwrap();
-            let mut output = String::from("The model couldn't be found in OpenRouter's API.");
+            let mut output =
+                String::from("The requested model could not be found with the OpenRouter API.");
 
-            for model in response.data {
-                if model.name == s {
+            for Data { id } in response.data {
+                if id == s {
                     output = s.to_string();
-                    break;
+                    return Ok(output);
                 }
             }
 
-            Ok(Some(output))
+            Err(output)
         }
-        Err(e) => Err("There's been an error processing the list of models.".to_string()),
+        Err(_) => Err(
+            "There's been an error checking the requested model with the OpenRouter API."
+                .to_string(),
+        ),
     }
 }

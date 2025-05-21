@@ -7,8 +7,20 @@
 use anyhow::Result;
 use console::{style, Term};
 use dialoguer::theme::ColorfulTheme;
+use dialoguer::Confirm;
 use dialoguer::Input;
 use regex::Regex;
+
+/// This function is in charge of retrieving input when a game ends, to ask the user if they want to
+/// continue playing another game or not.
+pub(crate) fn exit(term: &Term) -> Result<bool> {
+    let input: bool = Confirm::with_theme(&ColorfulTheme::default())
+        .with_prompt(format!("{}", style("Continue for another game?")))
+        .wait_for_newline(true)
+        .interact_on(term)?;
+
+    Ok(input)
+}
 
 /// This function is in charge of taking the input for the number guess made by the user after
 /// taking the range in which they want to play.
@@ -45,7 +57,7 @@ pub(crate) fn take_input(term: &Term, range: &(usize, usize)) -> Result<usize> {
 /// This function is in charge of taking a ranged input of values from the user to pick a number to
 /// guess. These values will serve as the bounds of the game and the one number that the user will
 /// later try to guess will be found within this range.
-pub(crate) fn take_ranged_input(term: &Term, re: Regex) -> Result<(usize, usize)> {
+pub(crate) fn take_ranged_input(term: &Term, re: &Regex) -> Result<(usize, usize)> {
     let input: String = Input::with_theme(&ColorfulTheme::default())
         .with_prompt(format!(
             "{}",
@@ -71,6 +83,7 @@ pub(crate) fn take_ranged_input(term: &Term, re: Regex) -> Result<(usize, usize)
         })
         .interact_text_on(term)?;
 
+    // unwraps are safe; the previous validate_with() method calls made it safe
     let (start, mut end) = input.split_at(input.find("..").unwrap());
     (_, end) = end.split_at(end.find(|value: char| value.is_numeric()).unwrap());
 

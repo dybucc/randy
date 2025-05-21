@@ -10,7 +10,7 @@ use fastrand::Rng;
 use regex::Regex;
 use serde::Deserialize;
 
-use crate::input::{take_input, take_ranged_input};
+use crate::input::{exit, take_input, take_ranged_input};
 use crate::messages::{process_message, response_error};
 
 /// This struct holds information about the application when it comes to the command-line argument
@@ -84,38 +84,47 @@ pub(crate) enum RandomResult {
 /// - io::Error
 /// - dialoguer::Error
 /// - randyrand::ResponseError
-// TODO add a main loop to all of the logic except the stateful variables for the stdout stream,
-// the rng instance, the command line argument parser and the compiler regular expression
+#[expect(
+    clippy::missing_panics_doc,
+    reason = "The panic's only due to the unwrapping of a regular expression. It's been tested, and it's been proven to be syntactically correct."
+)]
 pub fn init() -> Result<()> {
     let term = Term::stdout();
-    let rng = Rng::new();
+    let mut rng = Rng::new();
     let cli = Cli::parse();
     let ranged_re = Regex::new(r"\A\d+\.\.\d+\z").unwrap();
+    let model = cli
+        .model
+        .unwrap_or("deepseek/deepseek-chat-v3-0324:free".to_string());
 
     // show the init message
     init_message(&term)?;
 
-    // prompt for a range of inputs
-    let range = take_ranged_input(&term, ranged_re)?;
+    // game loop
+    loop {
+        // prompt for a range of inputs
+        let range = take_ranged_input(&term, &ranged_re)?;
 
-    // prompt for an input
-    let input = take_input(&term, &range)?;
+        // prompt for an input
+        let input = take_input(&term, &range)?;
 
-    // run the rng within the given range and check the user's input
-    let result = process_random(range, input, rng);
+        // run the rng within the given range and check the user's input
+        let result = process_random(range, input, &mut rng);
 
-    // process the message query to say that the user won or not
-    match process_message(
-        result,
-        &cli.api_key,
-        &cli.model
-            .unwrap_or("deepseek/deepseek-chat-v3-0324:free".to_string()),
-    ) {
-        Ok(output) => {
-            term.write_line(&format!("{}", style(output).bold()))?;
-            Ok(())
+        // process the message query to say that the user won or not
+        match process_message(result, &cli.api_key, &model) {
+            Ok(output) => {
+                term.write_line(&format!("{}", style(output).bold()))?;
+
+                if !exit(&term)? {
+                    term.clear_screen()?;
+                    break Ok(());
+                }
+
+                term.clear_screen()?;
+            }
+            Err(err) => break Err(response_error(err)),
         }
-        Err(err) => Err(response_error(err)),
     }
 }
 
@@ -137,7 +146,7 @@ fn init_message(term: &Term) -> Result<()> {
 /// This functions takes the role of number generator, as it takes both inputs from the user per
 /// game, and both produces the number to be guessed within the given range, and matches the user
 /// input to such number.
-fn process_random(range: (usize, usize), input: usize, mut rng: Rng) -> RandomResult {
+fn process_random(range: (usize, usize), input: usize, rng: &mut Rng) -> RandomResult {
     let random = rng.usize(range.0..=range.1);
 
     match input {

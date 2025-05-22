@@ -1,3 +1,15 @@
+## 0.3.0 (2025-05-22)
+
+### Feat
+
+- implement final score overview
+- implement score count
+- implement introduction to the game
+
+### Refactor
+
+- simplify request response objects
+
 ## 0.2.0 (2025-05-22)
 
 ### Feat

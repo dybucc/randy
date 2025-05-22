@@ -5,6 +5,7 @@
 
 // #![expect(unused, reason = "Temporary allow during development.")]
 
+mod frame;
 mod game;
 mod input;
 mod messages;

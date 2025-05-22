@@ -13,8 +13,14 @@ use indicatif::{ProgressBar, ProgressStyle};
 use regex::Regex;
 use serde::Deserialize;
 
-use crate::input::{exit, take_input, take_ranged_input};
-use crate::messages::{process_message, response_error};
+use crate::{
+    frame,
+    input::{exit, take_input, take_ranged_input},
+};
+use crate::{
+    frame::Selected,
+    messages::{process_message, response_error},
+};
 
 /// This struct holds information about the application when it comes to the command-line argument
 /// parser of choice, which is clap. It uses the derive attribute and multiple other attributes to
@@ -89,59 +95,78 @@ pub(crate) enum RandomResult {
 /// - randyrand::ResponseError
 pub fn init() -> Result<()> {
     let term = Term::stdout();
-    let mut rng = Rng::new();
-    let cli = Cli::parse();
-    let ranged_re = Regex::new(r"\A\d+\.\.\d+\z")?;
-    let model = cli
-        .model
-        .unwrap_or_else(|| "deepseek/deepseek-chat-v3-0324:free".to_owned());
-    let mut score = 0;
+    let mut menu = Selected::Play;
 
-    // show the init message
-    init_message(&term)?;
+    term.clear_screen()?;
+    frame::draw_menu(&term, menu)?;
 
-    // game loop
     loop {
-        // call a score counter and a newline, and a reset to the left of the terminal to ask for
-        // input
-        score_display(&term, &score.to_string())?;
+        menu = frame::nav(&term, menu)?;
 
-        // prompt for a range of inputs
-        let range = take_ranged_input(&term, &ranged_re)?;
-
-        // prompt for an input
-        let input = take_input(&term, &range)?;
-
-        // run the rng within the given range and check the user's input
-        let result = process_random(range, input, &mut rng);
-
-        if matches!(result, RandomResult::Correct) {
-            score += 1;
-        }
-
-        // process the message query to say that the user won or not
-        match process_message(result, &cli.api_key, &model) {
-            Ok(output) => {
-                term.write_line(&format!("{}", style(output).bold()))?;
-
-                if !exit(&term)? {
-                    term.clear_screen()?;
-
-                    // show the total score and ask for input to continue and exit
-                    score_display(&term, &score.to_string())?;
-                    term.write_line("")?;
-                    press_enter(&term)?;
-
-                    term.clear_screen()?;
-
-                    break Ok(());
-                }
-
-                term.clear_screen()?;
-            }
-            Err(err) => break Err(response_error(err)),
+        match frame::select(&term, menu)? {
+            frame::Action::Pass => continue,
+            frame::Action::Finish => break,
+            frame::Action::OptionsPage => break,
+            frame::Action::StartGame => break,
         }
     }
+
+    Ok(())
+
+    // let term = Term::stdout();
+    // let mut rng = Rng::new();
+    // let cli = Cli::parse();
+    // let ranged_re = Regex::new(r"\A\d+\.\.\d+\z")?;
+    // let model = cli
+    //     .model
+    //     .unwrap_or_else(|| "deepseek/deepseek-chat-v3-0324:free".to_owned());
+    // let mut score = 0;
+
+    // // show the init message
+    // init_message(&term)?;
+
+    // // game loop
+    // loop {
+    //     // call a score counter and a newline, and a reset to the left of the terminal to ask for
+    //     // input
+    //     score_display(&term, &score.to_string())?;
+
+    //     // prompt for a range of inputs
+    //     let range = take_ranged_input(&term, &ranged_re)?;
+
+    //     // prompt for an input
+    //     let input = take_input(&term, &range)?;
+
+    //     // run the rng within the given range and check the user's input
+    //     let result = process_random(range, input, &mut rng);
+
+    //     if matches!(result, RandomResult::Correct) {
+    //         score += 1;
+    //     }
+
+    //     // process the message query to say that the user won or not
+    //     match process_message(result, &cli.api_key, &model) {
+    //         Ok(output) => {
+    //             term.write_line(&format!("{}", style(output).bold()))?;
+
+    //             if !exit(&term)? {
+    //                 term.clear_screen()?;
+
+    //                 // show the total score and ask for input to continue and exit
+    //                 score_display(&term, &score.to_string())?;
+    //                 term.write_line("")?;
+    //                 press_enter(&term)?;
+
+    //                 term.clear_screen()?;
+
+    //                 break Ok(());
+    //             }
+
+    //             term.clear_screen()?;
+    //         }
+    //         Err(err) => break Err(response_error(err)),
+    //     }
+    // }
 }
 
 /// This function initializes the message to be used at the start of the program, as well as a few

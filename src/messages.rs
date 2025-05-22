@@ -42,7 +42,7 @@ enum ExtraError {
     clippy::arbitrary_source_item_ordering,
     reason = "The JSON schema needs the fields to be in this order."
 )]
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
 struct Message {
     /// This field is one of the required fields in the request to the OpenRouter API.
     role: Role,
@@ -64,7 +64,7 @@ impl Message {
 /// This structure holds the main source of information about the request to the OpenRouter API for
 /// chat completion. It contains as well a builder function of the request with the predefined
 /// defaults required by this program.
-#[derive(Serialize)]
+#[derive(Serialize, Debug, PartialEq)]
 struct Request {
     /// This field contains information about the messages to be sent to the LLM.
     messages: Vec<Message>,
@@ -166,7 +166,7 @@ enum ResponseError {
 
 /// This enum holds the different roles the LLM or the user can take on during a chat completion
 /// request.
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, PartialEq, Debug)]
 #[serde(rename_all = "lowercase")]
 enum Role {
     /// This variant contains the assistant role used by the LLM on text-based chat completion
@@ -247,5 +247,81 @@ pub(crate) fn response_error(input: Error) -> Error {
             _ => ResponseError::Unknown.into(),
         },
         _ => ResponseError::Unknown.into(),
+    }
+}
+
+#[expect(
+    clippy::arbitrary_source_item_ordering,
+    reason = "Tests are best left to the end of source files."
+)]
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn message_is_correct() {
+        let input = (Role::Assistant, "assistant");
+        let expect = Message {
+            role: Role::Assistant,
+            content: "assistant".to_owned(),
+        };
+        let actual = Message::new(input.0, input.1);
+
+        assert_eq!(expect, actual);
+    }
+
+    #[test]
+    fn correct_request_is_right() {
+        let input = (RandomResult::Correct, "deepseek");
+        let expect = Request {
+            messages: vec![
+                Message::new(Role::System, *LLM_INPUT),
+                Message::new(Role::User, "Correct"),
+            ],
+            model: "deepseek".to_owned(),
+        };
+        let actual = Request::new(input.0, input.1);
+
+        assert_eq!(expect, actual);
+    }
+
+    #[test]
+    fn incorrect_request_is_right() {
+        let input = (RandomResult::Incorrect, "deepseek");
+        let expect = Request {
+            messages: vec![
+                Message::new(Role::System, *LLM_INPUT),
+                Message::new(Role::User, "Incorrect"),
+            ],
+            model: "deepseek".to_owned(),
+        };
+        let actual = Request::new(input.0, input.1);
+
+        assert_eq!(expect, actual);
+    }
+
+    #[test]
+    #[should_panic = "invalid credentials"]
+    // The below function can't deterministically check for the sucess of the function, but it can
+    // check if the function either returns an error or otherwise shows a non-empty string.
+    fn incorrect_api_key_is_detected() {
+        // api key is secure; it's set to have 0 credits available in my openrouter page
+        let input = (
+            RandomResult::Correct,
+            "sk",
+            "deepseek/deepseek-chat-v3-0324:free",
+        );
+
+        match process_message(input.0, input.1, input.2) {
+            Ok(_) => (),
+            Err(error) => {
+                if matches!(
+                    error.downcast::<ureq::Error>().expect("not a ureq error"),
+                    ureq::Error::StatusCode(401)
+                ) {
+                    panic!("invalid credentials")
+                }
+            }
+        }
     }
 }

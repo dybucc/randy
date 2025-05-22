@@ -244,3 +244,32 @@ fn verify_model(string: &str) -> Result<String, String> {
         ),
     }
 }
+
+#[expect(
+    clippy::arbitrary_source_item_ordering,
+    reason = "Tests are best left to the end of source files."
+)]
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+
+    #[test]
+    fn verifies_correct_model() {
+        let input = "deepseek/deepseek-chat-v3-0324:free";
+        let expect: Result<String, String> = Ok(input.to_owned());
+        let actual = verify_model(input);
+
+        assert_eq!(expect, actual);
+    }
+
+    #[test]
+    fn verifies_incorrect_model() {
+        let input = "deepseek";
+        let expect: Result<String, String> =
+            Err("The requested model could not be found with the OpenRouter API.".to_owned());
+        let actual = verify_model(input);
+
+        assert_eq!(expect, actual);
+    }
+}

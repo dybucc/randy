@@ -28,14 +28,10 @@ pub(crate) fn take_input(term: &Term, range: &(usize, usize)) -> Result<usize> {
     let input: usize = Input::with_theme(&ColorfulTheme::default())
         .with_prompt(format!("{}", style("Input a number").bold()))
         .validate_with(|input: &String| -> Result<(), &str> {
-            if input
-                .as_bytes()
-                .iter()
-                .all(|charac| charac.is_ascii_digit())
-            {
+            if input.as_bytes().iter().all(u8::is_ascii_digit) {
                 // unwrap is safe; at this point, the string is knwown to be solely made out of
                 // digits
-                let num: usize = input.parse().unwrap();
+                let num: usize = input.parse().expect("input couldn't be parsed");
 
                 if num >= range.0 && num <= range.1 {
                     return Ok(());
@@ -49,7 +45,7 @@ pub(crate) fn take_input(term: &Term, range: &(usize, usize)) -> Result<usize> {
         .interact_text_on(term)?
         .parse()
         // unwrap is safe; the input was validated with dialoguer's validate_with() method
-        .unwrap();
+        .expect("input couldn't be parsed");
 
     Ok(input)
 }
@@ -67,7 +63,8 @@ pub(crate) fn take_ranged_input(term: &Term, re: &Regex) -> Result<(usize, usize
             if re.is_match(string) {
                 // unwrap is safe; the two dots are part of the regex that must pass before this is
                 // checked
-                let (start, end) = string.split_at(string.find("..").unwrap());
+                let (start, end) =
+                    string.split_at(string.find("..").expect("sequence couldn't be found"));
                 let mut end: String = end.chars().rev().collect();
                 end.truncate(1);
                 let start = start.parse::<usize>();
@@ -84,8 +81,14 @@ pub(crate) fn take_ranged_input(term: &Term, re: &Regex) -> Result<(usize, usize
         .interact_text_on(term)?;
 
     // unwraps are safe; the previous validate_with() method calls made it safe
-    let (start, mut end) = input.split_at(input.find("..").unwrap());
-    (_, end) = end.split_at(end.find(|value: char| value.is_numeric()).unwrap());
+    let (start, mut end) = input.split_at(input.find("..").expect("sequence couldn't be found"));
+    (_, end) = end.split_at(
+        end.find(|value: char| value.is_numeric())
+            .expect("pattern couldn't be found"),
+    );
 
-    Ok((start.parse().unwrap(), end.parse().unwrap()))
+    Ok((
+        start.parse().expect("input couldn't be parsed"),
+        end.parse().expect("input couldn't be parsed"),
+    ))
 }

@@ -84,18 +84,14 @@ pub(crate) enum RandomResult {
 /// - io::Error
 /// - dialoguer::Error
 /// - randyrand::ResponseError
-#[expect(
-    clippy::missing_panics_doc,
-    reason = "The panic's only due to the unwrapping of a regular expression. It's been tested, and it's been proven to be syntactically correct."
-)]
 pub fn init() -> Result<()> {
     let term = Term::stdout();
     let mut rng = Rng::new();
     let cli = Cli::parse();
-    let ranged_re = Regex::new(r"\A\d+\.\.\d+\z").unwrap();
+    let ranged_re = Regex::new(r"\A\d+\.\.\d+\z")?;
     let model = cli
         .model
-        .unwrap_or("deepseek/deepseek-chat-v3-0324:free".to_string());
+        .unwrap_or_else(|| "deepseek/deepseek-chat-v3-0324:free".to_owned());
 
     // show the init message
     init_message(&term)?;
@@ -164,13 +160,14 @@ fn verify_model(string: &str) -> Result<String, String> {
 
     match request {
         Ok(response) => {
-            let response: ModelResponse = response.into_body().read_json().unwrap();
+            let response: ModelResponse =
+                response.into_body().read_json().expect("response failed");
             let mut output =
                 String::from("The requested model could not be found with the OpenRouter API.");
 
             for Data { id } in response.data {
                 if id == string {
-                    output = string.to_string();
+                    string.clone_into(&mut output);
                     return Ok(output);
                 }
             }
@@ -179,7 +176,7 @@ fn verify_model(string: &str) -> Result<String, String> {
         }
         Err(_) => Err(
             "There's been an error checking the requested model with the OpenRouter API."
-                .to_string(),
+                .to_owned(),
         ),
     }
 }

@@ -56,7 +56,7 @@ impl Message {
     fn new(role: Role, content: &str) -> Self {
         Self {
             role,
-            content: content.to_string(),
+            content: content.to_owned(),
         }
     }
 }
@@ -85,14 +85,14 @@ impl Request {
                     Message::new(Role::System, *LLM_INPUT),
                     Message::new(Role::User, "Correct"),
                 ],
-                model: model.to_string(),
+                model: model.to_owned(),
             },
             RandomResult::Incorrect => Self {
                 messages: vec![
                     Message::new(Role::System, *LLM_INPUT),
                     Message::new(Role::User, "Incorrect"),
                 ],
-                model: model.to_string(),
+                model: model.to_owned(),
             },
         }
     }
@@ -237,8 +237,13 @@ pub(crate) fn process_message(input: RandomResult, api_key: &str, model: &str) -
 
         // unwraps are safe because at this point there is always a response with the expected json
         // schema
-        let response: Response = response.into_body().read_json().unwrap();
-        let output = &response.choices.first().unwrap().message.content;
+        let response: Response = response.into_body().read_json().expect("response failed");
+        let output = &response
+            .choices
+            .first()
+            .expect("no elements were found")
+            .message
+            .content;
 
         // if the returned response has an empty body, the model is warming up or the system is
         // scaling
@@ -257,7 +262,10 @@ pub(crate) fn process_message(input: RandomResult, api_key: &str, model: &str) -
 /// solely by means of checking the status code returned by the underlying ureq error. This also
 /// means whatever was carried in the body of the faulty response is completely discarded.
 pub(crate) fn response_error(input: Error) -> Error {
-    match input.downcast_ref::<ureq::Error>().unwrap() {
+    match *input
+        .downcast_ref::<ureq::Error>()
+        .expect("no underlying error found")
+    {
         ureq::Error::StatusCode(status) => match status {
             400 => ResponseError::BadRequest.into(),
             401 => ResponseError::InvalidCredentials.into(),

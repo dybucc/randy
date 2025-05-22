@@ -28,7 +28,7 @@ Don't include emoji or otherwise non-verbal content."
 
 /// This enum serves as a way of extending the possible errors from the default requests, so as to
 /// smooth the experience of the user.
-#[derive(thiserror::Error, Debug)]
+#[derive(thiserror::Error, Debug, PartialEq)]
 enum ExtraError {
     /// This variant refers to a manual time out that has been, for now, hardcoded to allow exitting
     /// if the no request has any content for more than 10 requests.
@@ -262,6 +262,14 @@ pub(crate) fn process_message(input: RandomResult, api_key: &str, model: &str) -
 /// solely by means of checking the status code returned by the underlying ureq error. This also
 /// means whatever was carried in the body of the faulty response is completely discarded.
 pub(crate) fn response_error(input: Error) -> Error {
+    if *input
+        .downcast_ref::<ExtraError>()
+        .expect("no underlying error found")
+        == ExtraError::TimedOut
+    {
+        return input.downcast().expect("no underlying error found");
+    }
+
     match *input
         .downcast_ref::<ureq::Error>()
         .expect("no underlying error found")

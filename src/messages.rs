@@ -100,45 +100,18 @@ impl Request {
 
 /// This structure serves as the container for the response obtained by the LLM with OpenRouter's
 /// API's POST request for chat completion.
-#[expect(
-    clippy::arbitrary_source_item_ordering,
-    reason = "The JSON schema needs the fields to be in this order."
-)]
 #[derive(Serialize, Deserialize)]
 struct Response {
-    /// This field contains the ID of the message returned by the LLM in this specific exchange.
-    id: String,
     /// This field contains the responses returned by the LLM, which in the case of purely
     /// text-based queries, is made up of a single element.
     choices: Vec<ResponseChoices>,
-    /// This field contains the UNIX timestamp at which the request was made.
-    created: usize,
-    /// This field contains the model of the LLM used.
-    model: String,
-    /// This field contains either one of two variants for the type of object returned. The meaning
-    /// of this field is not personally not certain, but is nevertheless required by the returned
-    /// response.
-    object: ResponseObject,
 }
 
 /// This structure serves as part of the request JSON sent to the OpenRouter API containing the
 /// actual messages behind the LLM response, as well as some other details particular to the
 /// response.
-#[expect(
-    clippy::arbitrary_source_item_ordering,
-    reason = "The JSON schema needs the fields to be in this order."
-)]
 #[derive(Serialize, Deserialize)]
 struct ResponseChoices {
-    /// This field documents the reason why the LLM finished outputting content. It's strict in that
-    /// it serves as a general overview of whether the LLM's status at the end of its chat
-    /// completion. The "source" is rather found in the `native_finish_reason` field, which may or
-    /// may not be provided in the response.
-    finish_reason: String,
-    /// This field documents the reason why the LLM finished outputting content according the
-    /// provider of the LLM. This may not always be provided, and is both dependent on the LLM and
-    /// the provider.
-    native_finish_reason: String,
     /// This field contains the `Message` object, with information about both the role of the LLM
     /// in the response, and the response itself.
     message: Message,
@@ -189,18 +162,6 @@ enum ResponseError {
     /// not any of the above variants.
     #[error("{}", style("unknown error").bold().underlined())]
     Unknown,
-}
-
-/// This enum holds the different types of objects returned as a response to a chat completion
-/// request in the OpenRouter API.
-#[derive(Serialize, Deserialize)]
-enum ResponseObject {
-    /// This variant contains one of the variants for the object field in the JSON response.
-    #[serde(rename = "chat.completion")]
-    ChatCompletion,
-    /// This variant contains one of the variants for the object field in the JSON response.
-    #[serde(rename = "chat.completion.chunk")]
-    ChatCompletionChunk,
 }
 
 /// This enum holds the different roles the LLM or the user can take on during a chat completion

@@ -3,7 +3,7 @@
 //! It contains the `init()` function to initialize and start the game loop, as well as the game
 //! initialization message, some terminal configuration and the random number processor.
 
-use std::time::Duration;
+use std::{borrow::Borrow as _, time::Duration};
 
 use anyhow::Result;
 use clap::Parser;
@@ -95,12 +95,17 @@ pub fn init() -> Result<()> {
     let model = cli
         .model
         .unwrap_or_else(|| "deepseek/deepseek-chat-v3-0324:free".to_owned());
+    let mut score = 0;
 
     // show the init message
     init_message(&term)?;
 
     // game loop
     loop {
+        // call a score counter and a newline, and a reset to the left of the terminal to ask for
+        // input
+        score_display(&term, &score.to_string())?;
+
         // prompt for a range of inputs
         let range = take_ranged_input(&term, &ranged_re)?;
 
@@ -109,6 +114,10 @@ pub fn init() -> Result<()> {
 
         // run the rng within the given range and check the user's input
         let result = process_random(range, input, &mut rng);
+
+        if matches!(result, RandomResult::Correct) {
+            score += 1;
+        }
 
         // process the message query to say that the user won or not
         match process_message(result, &cli.api_key, &model) {
@@ -177,6 +186,18 @@ fn process_random(range: (usize, usize), input: usize, rng: &mut Rng) -> RandomR
         _ if input == random => RandomResult::Correct,
         _ => RandomResult::Incorrect,
     }
+}
+
+/// This function outputs a total score at the top right of the screen, with information on how many
+/// numbers the user has guessed right.
+fn score_display(term: &Term, score: &str) -> Result<()> {
+    let (_, cols) = term.size();
+    let score = format!("{}", style(format!("Score {score}")).bold().on_cyan());
+    let output = console::pad_str(&score, cols as usize, console::Alignment::Right, None);
+
+    term.write_line(output.borrow())?;
+
+    Ok(())
 }
 
 /// This function serves as a value parser for the command line argument parser in the `model`

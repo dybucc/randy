@@ -31,7 +31,7 @@ Don't include emoji or otherwise non-verbal content."
 #[derive(thiserror::Error, Debug, PartialEq)]
 enum ExtraError {
     /// This variant refers to a manual time out that has been, for now, hardcoded to allow exitting
-    /// if the no request has any content for more than 10 requests.
+    /// if the request has no content for more than 10 requests.
     #[error("{}", style("timed out after multiple requests").bold())]
     TimedOut,
 }

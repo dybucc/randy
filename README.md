@@ -48,6 +48,12 @@ Everything's in the `--help` command option, though it is also detailed here.
 
 ## Install
 
+### crates.io
+
+```
+cargo install --locked --no-track randyrand
+```
+
 ### Source
 
 ```

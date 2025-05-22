@@ -3,10 +3,13 @@
 //! It contains the `init()` function to initialize and start the game loop, as well as the game
 //! initialization message, some terminal configuration and the random number processor.
 
+use std::time::Duration;
+
 use anyhow::Result;
 use clap::Parser;
 use console::{style, Term};
 use fastrand::Rng;
+use indicatif::{ProgressBar, ProgressStyle};
 use regex::Regex;
 use serde::Deserialize;
 
@@ -125,17 +128,42 @@ pub fn init() -> Result<()> {
 }
 
 /// This function initializes the message to be used at the start of the program, as well as a few
-/// other fallible operations. Among these, the screen is cleared and the cursor is hidden. The
-/// title of the console window is also set to the name of the game.
+/// other fallible operations.
+///
+/// It loads the game title, sets the terminal name while running the program, and shows a spinner
+/// animation with a helper text to press a key to continue.
 fn init_message(term: &Term) -> Result<()> {
+    // maybe add a string that is more flashy; an ascii art generator should do
+    // if the ascii art is added, it will best be fit as a lazy static outside this function
     const MSG: &str = "Welcome to the game of randy";
     let msg = style(MSG).bold();
 
     term.clear_screen()?;
     term.set_title("randy");
-    term.hide_cursor()?;
 
     term.write_line(&format!("{}", msg))?;
+    term.write_line("")?;
+
+    let progress = ProgressBar::new_spinner()
+        .with_prefix("Press return to continue")
+        .with_style(
+            ProgressStyle::default_spinner()
+                .tick_strings(&["", ".", "..", "...", ""])
+                .template("{prefix:^}{spinner:>}")?,
+        );
+
+    loop {
+        progress.enable_steady_tick(Duration::from_millis(500));
+        let input = term.read_key()?;
+
+        if input == console::Key::Enter {
+            break;
+        }
+    }
+
+    progress.finish_and_clear();
+    term.clear_screen()?;
+
     Ok(())
 }
 

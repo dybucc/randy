@@ -126,6 +126,14 @@ pub fn init() -> Result<()> {
 
                 if !exit(&term)? {
                     term.clear_screen()?;
+
+                    // show the total score and ask for input to continue and exit
+                    score_display(&term, &score.to_string())?;
+                    term.write_line("")?;
+                    press_enter(&term)?;
+
+                    term.clear_screen()?;
+
                     break Ok(());
                 }
 
@@ -149,10 +157,18 @@ fn init_message(term: &Term) -> Result<()> {
 
     term.clear_screen()?;
     term.set_title("randy");
-
     term.write_line(&format!("{}", msg))?;
-    term.write_line("")?;
 
+    term.write_line("")?;
+    press_enter(term)?;
+    term.clear_screen()?;
+
+    Ok(())
+}
+
+/// This function reads a key from the user and considers if the key is the return key to finish a
+/// spinner animation.
+fn press_enter(term: &Term) -> Result<()> {
     let progress = ProgressBar::new_spinner()
         .with_prefix("Press return to continue")
         .with_style(
@@ -171,7 +187,6 @@ fn init_message(term: &Term) -> Result<()> {
     }
 
     progress.finish_and_clear();
-    term.clear_screen()?;
 
     Ok(())
 }
@@ -193,7 +208,7 @@ fn process_random(range: (usize, usize), input: usize, rng: &mut Rng) -> RandomR
 fn score_display(term: &Term, score: &str) -> Result<()> {
     let (_, cols) = term.size();
     let score = format!("{}", style(format!("Score {score}")).bold().on_cyan());
-    let output = console::pad_str(&score, cols as usize, console::Alignment::Right, None);
+    let output = console::pad_str(&score, cols as usize, console::Alignment::Center, None);
 
     term.write_line(output.borrow())?;
 

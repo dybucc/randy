@@ -18,8 +18,8 @@
 )]
 
 use anyhow::Result;
-use randyrand::init;
+use randyrand::run;
 
 fn main() -> Result<()> {
-    init()
+    run()
 }

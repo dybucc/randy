@@ -10,4 +10,4 @@ mod game;
 mod input;
 mod messages;
 
-pub use game::init;
+pub use game::run;

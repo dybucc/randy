@@ -10,17 +10,11 @@ use clap::Parser;
 use console::{style, Term};
 use fastrand::Rng;
 use indicatif::{ProgressBar, ProgressStyle};
-use regex::Regex;
 use serde::Deserialize;
 
-use crate::{
-    frame,
-    input::{exit, take_input, take_ranged_input},
-};
-use crate::{
-    frame::Selected,
-    messages::{process_message, response_error},
-};
+use crate::frame::main_menu::{MainMenu, MainMenuAction};
+use crate::frame::options::{OptionsMenu, OptionsMenuAction};
+use crate::frame::{self, nav_menu};
 
 /// This struct holds information about the application when it comes to the command-line argument
 /// parser of choice, which is clap. It uses the derive attribute and multiple other attributes to
@@ -93,29 +87,39 @@ pub(crate) enum RandomResult {
 /// - io::Error
 /// - dialoguer::Error
 /// - randyrand::ResponseError
-pub fn init() -> Result<()> {
+pub fn run() -> Result<()> {
     let term = Term::stdout();
-    let mut menu = Selected::Play;
-
-    term.clear_screen()?;
-    frame::draw_menu(&term, menu)?;
+    let cli = Cli::parse();
+    let mut model = cli
+        .model
+        .unwrap_or_else(|| "deepseek/deepseek-chat-v3-0324:free".to_owned());
+    let mut main_menu = MainMenu::Play;
+    let mut options_menu = OptionsMenu::Model;
 
     loop {
-        menu = frame::nav(&term, menu)?;
+        frame::draw_menu(&term, &main_menu)?;
 
-        match frame::select(&term, menu)? {
-            frame::Action::Pass => continue,
-            frame::Action::Finish => break,
-            frame::Action::OptionsPage => break,
-            frame::Action::StartGame => break,
+        match nav_menu(&term, &mut main_menu)? {
+            MainMenuAction::Pass => continue,
+            MainMenuAction::Finish => break,
+            MainMenuAction::OptionsPage => options(&term, &mut options_menu, &mut model)?,
+            MainMenuAction::StartGame => {
+                // implement a function that asks for input in a two-part prompt on the same frame,
+                // e.g.
+                // Input a range
+                // [prompt]
+                // Input a number
+                // [prompt]
+                todo!()
+            }
         }
     }
 
+    term.clear_screen()?;
+
     Ok(())
 
-    // let term = Term::stdout();
     // let mut rng = Rng::new();
-    // let cli = Cli::parse();
     // let ranged_re = Regex::new(r"\A\d+\.\.\d+\z")?;
     // let model = cli
     //     .model
@@ -167,6 +171,27 @@ pub fn init() -> Result<()> {
     //         Err(err) => break Err(response_error(err)),
     //     }
     // }
+}
+
+/// This function renders the options menu.
+fn options(term: &Term, menu: &mut OptionsMenu, model: &mut str) -> Result<()> {
+    frame::draw_menu(term, menu)?;
+
+    loop {
+        match nav_menu(term, menu)? {
+            OptionsMenuAction::ChangeModel => {
+                // implement a frame with a prompt asking for input on the model; it shouldn't be
+                // open-ended but rather be a list with the actual models fetched from the
+                // openrouter API; this is hard because not only a prompt, but a sliding selector
+                // must be implemented from scratch.
+                todo!()
+            }
+            OptionsMenuAction::GoBack => break,
+            OptionsMenuAction::Pass => continue,
+        }
+    }
+
+    Ok(())
 }
 
 /// This function initializes the message to be used at the start of the program, as well as a few

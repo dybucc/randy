@@ -5,6 +5,7 @@
 pub(crate) mod main_menu;
 pub(crate) mod options;
 pub(crate) mod prompt;
+pub(crate) mod random_prompt;
 
 use anyhow::Result;
 use console::{style, Key, Term};

@@ -14,7 +14,8 @@ use serde::Deserialize;
 
 use crate::frame::main_menu::{MainMenu, MainMenuAction};
 use crate::frame::options::{OptionsMenu, OptionsMenuAction};
-use crate::frame::{self, nav_menu};
+use crate::frame::prompt::nav_sliding_prompt;
+use crate::frame::{draw_menu, nav_menu};
 
 /// This struct holds information about the application when it comes to the command-line argument
 /// parser of choice, which is clap. It uses the derive attribute and multiple other attributes to
@@ -97,7 +98,7 @@ pub fn run() -> Result<()> {
     let mut options_menu = OptionsMenu::Model;
 
     loop {
-        frame::draw_menu(&term, &main_menu)?;
+        draw_menu(&term, &main_menu)?;
 
         match nav_menu(&term, &mut main_menu)? {
             MainMenuAction::Pass => continue,
@@ -174,17 +175,13 @@ pub fn run() -> Result<()> {
 }
 
 /// This function renders the options menu.
-fn options(term: &Term, menu: &mut OptionsMenu, model: &mut str) -> Result<()> {
-    frame::draw_menu(term, menu)?;
-
+fn options(term: &Term, menu: &mut OptionsMenu, model: &mut String) -> Result<()> {
     loop {
+        draw_menu(term, menu)?;
+
         match nav_menu(term, menu)? {
             OptionsMenuAction::ChangeModel => {
-                // implement a frame with a prompt asking for input on the model; it shouldn't be
-                // open-ended but rather be a list with the actual models fetched from the
-                // openrouter API; this is hard because not only a prompt, but a sliding selector
-                // must be implemented from scratch.
-                todo!()
+                nav_sliding_prompt(term, model)?;
             }
             OptionsMenuAction::GoBack => break,
             OptionsMenuAction::Pass => continue,

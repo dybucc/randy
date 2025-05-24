@@ -10,11 +10,13 @@ use clap::Parser;
 use console::{style, Term};
 use fastrand::Rng;
 use indicatif::{ProgressBar, ProgressStyle};
+use regex::Regex;
 use serde::Deserialize;
 
 use crate::frame::main_menu::{MainMenu, MainMenuAction};
 use crate::frame::options::{OptionsMenu, OptionsMenuAction};
 use crate::frame::prompt::nav_sliding_prompt;
+use crate::frame::random_prompt::nav_input_prompt;
 use crate::frame::{draw_menu, nav_menu};
 
 /// This struct holds information about the application when it comes to the command-line argument
@@ -96,6 +98,9 @@ pub fn run() -> Result<()> {
         .unwrap_or_else(|| "deepseek/deepseek-chat-v3-0324:free".to_owned());
     let mut main_menu = MainMenu::Play;
     let mut options_menu = OptionsMenu::Model;
+    let ranged_re = Regex::new(r"\A\d+\.\.\d+\z")?;
+    let random_re = Regex::new(r"\A\d+\z")?;
+    let mut rng = Rng::new();
 
     loop {
         draw_menu(&term, &main_menu)?;
@@ -105,13 +110,12 @@ pub fn run() -> Result<()> {
             MainMenuAction::Finish => break,
             MainMenuAction::OptionsPage => options(&term, &mut options_menu, &mut model)?,
             MainMenuAction::StartGame => {
-                // implement a function that asks for input in a two-part prompt on the same frame,
-                // e.g.
-                // Input a range
-                // [prompt]
-                // Input a number
-                // [prompt]
-                todo!()
+                let (guess, range_start, range_end) =
+                    nav_input_prompt(&term, (&ranged_re, &random_re))?;
+
+                let result = process_random((range_start, range_end), guess, &mut rng);
+
+                break;
             }
         }
     }
@@ -119,59 +123,6 @@ pub fn run() -> Result<()> {
     term.clear_screen()?;
 
     Ok(())
-
-    // let mut rng = Rng::new();
-    // let ranged_re = Regex::new(r"\A\d+\.\.\d+\z")?;
-    // let model = cli
-    //     .model
-    //     .unwrap_or_else(|| "deepseek/deepseek-chat-v3-0324:free".to_owned());
-    // let mut score = 0;
-
-    // // show the init message
-    // init_message(&term)?;
-
-    // // game loop
-    // loop {
-    //     // call a score counter and a newline, and a reset to the left of the terminal to ask for
-    //     // input
-    //     score_display(&term, &score.to_string())?;
-
-    //     // prompt for a range of inputs
-    //     let range = take_ranged_input(&term, &ranged_re)?;
-
-    //     // prompt for an input
-    //     let input = take_input(&term, &range)?;
-
-    //     // run the rng within the given range and check the user's input
-    //     let result = process_random(range, input, &mut rng);
-
-    //     if matches!(result, RandomResult::Correct) {
-    //         score += 1;
-    //     }
-
-    //     // process the message query to say that the user won or not
-    //     match process_message(result, &cli.api_key, &model) {
-    //         Ok(output) => {
-    //             term.write_line(&format!("{}", style(output).bold()))?;
-
-    //             if !exit(&term)? {
-    //                 term.clear_screen()?;
-
-    //                 // show the total score and ask for input to continue and exit
-    //                 score_display(&term, &score.to_string())?;
-    //                 term.write_line("")?;
-    //                 press_enter(&term)?;
-
-    //                 term.clear_screen()?;
-
-    //                 break Ok(());
-    //             }
-
-    //             term.clear_screen()?;
-    //         }
-    //         Err(err) => break Err(response_error(err)),
-    //     }
-    // }
 }
 
 /// This function renders the options menu.
@@ -189,6 +140,24 @@ fn options(term: &Term, menu: &mut OptionsMenu, model: &mut String) -> Result<()
     }
 
     Ok(())
+}
+
+/// This functions takes the role of number generator, as it takes both inputs from the user per
+/// game, and both produces the number to be guessed within the given range, and matches the user
+/// input to such number.
+fn process_random(range: (usize, usize), input: usize, rng: &mut Rng) -> RandomResult {
+    let random = rng.usize(range.0..=range.1);
+
+    match input {
+        _ if input == random => RandomResult::Correct,
+        _ => RandomResult::Incorrect,
+    }
+}
+
+/// This function builds a request body and processes a chat completion request to the OpenRouter
+/// API.
+fn process_request(term: &Term, model: &str, result: RandomResult) {
+    let request_body = todo!();
 }
 
 /// This function initializes the message to be used at the start of the program, as well as a few
@@ -236,18 +205,6 @@ fn press_enter(term: &Term) -> Result<()> {
     progress.finish_and_clear();
 
     Ok(())
-}
-
-/// This functions takes the role of number generator, as it takes both inputs from the user per
-/// game, and both produces the number to be guessed within the given range, and matches the user
-/// input to such number.
-fn process_random(range: (usize, usize), input: usize, rng: &mut Rng) -> RandomResult {
-    let random = rng.usize(range.0..=range.1);
-
-    match input {
-        _ if input == random => RandomResult::Correct,
-        _ => RandomResult::Incorrect,
-    }
 }
 
 /// This function outputs a total score at the top right of the screen, with information on how many
@@ -298,7 +255,6 @@ fn verify_model(string: &str) -> Result<String, String> {
 )]
 #[cfg(test)]
 mod tests {
-
     use super::*;
 
     #[test]

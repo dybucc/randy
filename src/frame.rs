@@ -59,9 +59,9 @@ where
         let item = var.repr();
 
         let content = if var == *menu {
-            format!("{}", style(format!("   {item}   ")).bold().on_cyan())
+            format!("{}", style(item).bold().on_cyan())
         } else {
-            format!("   {item}   ")
+            format!("{}", style(item).bold())
         };
 
         let output = console::pad_str(&content, cols as usize, console::Alignment::Center, None);

@@ -82,7 +82,7 @@ fn draw_sliding_prompt(term: &Term, prompt: &SlidingPrompt) -> Result<()> {
         term.write_line("")?;
     }
 
-    let text = format!("{}", style(format!("   {}   ", prompt.text)).bold());
+    let text = format!("{}", style(&prompt.text).bold());
     let text = console::pad_str(&text, cols as usize, console::Alignment::Center, None);
     term.write_line(&text)?;
 
@@ -90,15 +90,12 @@ fn draw_sliding_prompt(term: &Term, prompt: &SlidingPrompt) -> Result<()> {
     let selector;
     match prompt.selected {
         SelectedItem::Return => {
-            selector = format!("{}", style(format!("   {}   ", prompt.selector)).bold());
-            ret = format!("{}", style(format!("   {}   ", "Return")).bold().on_cyan());
+            selector = format!("{}", style(&prompt.selector).bold());
+            ret = format!("{}", style("Return").bold().on_cyan());
         }
         SelectedItem::Selector => {
-            selector = format!(
-                "{}",
-                style(format!("   {}   ", prompt.selector)).bold().on_cyan()
-            );
-            ret = format!("{}", style(format!("   {}   ", "Return")).bold());
+            selector = format!("{}", style(&prompt.selector).bold().on_cyan());
+            ret = format!("{}", style("Return").bold());
         }
     }
 

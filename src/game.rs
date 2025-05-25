@@ -161,27 +161,7 @@ pub fn run(model: Option<String>, api_key: &str) -> Result<()> {
             MainMenuAction::Finish => break,
             MainMenuAction::OptionsPage => options(&term, &mut options_menu, &mut model)?,
             MainMenuAction::StartGame => {
-                loop {
-                    let (guess, range_start, range_end) =
-                        nav_input_prompt(&term, (&ranged_re, &random_re))?;
-
-                    let result = process_random((range_start, range_end), guess, &mut rng);
-                    let message = process_request(&term, &model, api_key, result)?;
-
-                    term.clear_screen()?;
-                    let (rows, cols) = term.size();
-                    for _ in 1..rows / 2 {
-                        term.write_line("")?;
-                    }
-
-                    let output = pad_str(&message, cols as usize, console::Alignment::Center, None);
-                    term.write_line(&output)?;
-                    sleep(Duration::from_secs(5));
-
-                    if !nav_repeat_prompt(&term)? {
-                        break;
-                    }
-                }
+                init_game(&term, &ranged_re, &random_re, &mut rng, &model, api_key)?;
             }
         }
     }
@@ -202,6 +182,40 @@ fn options(term: &Term, menu: &mut OptionsMenu, model: &mut String) -> Result<()
             }
             OptionsMenuAction::GoBack => break,
             OptionsMenuAction::Pass => continue,
+        }
+    }
+
+    Ok(())
+}
+
+/// This function initializes the game loop and processes all logic involved in the game itself
+/// until the user decides to exit it.
+fn init_game(
+    term: &Term,
+    ranged_re: &Regex,
+    random_re: &Regex,
+    rng: &mut Rng,
+    model: &str,
+    api_key: &str,
+) -> Result<()> {
+    loop {
+        let (guess, range_start, range_end) = nav_input_prompt(term, (ranged_re, random_re))?;
+
+        let result = process_random((range_start, range_end), guess, rng);
+        let message = process_request(term, model, api_key, result)?;
+
+        term.clear_screen()?;
+        let (rows, cols) = term.size();
+        for _ in 1..rows / 2 {
+            term.write_line("")?;
+        }
+
+        let output = pad_str(&message, cols as usize, console::Alignment::Center, None);
+        term.write_line(&output)?;
+        sleep(Duration::from_secs(5));
+
+        if !nav_repeat_prompt(term)? {
+            break;
         }
     }
 

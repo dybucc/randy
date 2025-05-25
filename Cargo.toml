@@ -207,10 +207,7 @@ zero_sized_map_values = "deny"
 anyhow = { version = "1.0.98", features = ["backtrace"] }
 clap = { version = "4.5.38", features = ["derive", "env", "wrap_help"] }
 console = "0.15.11"
-dialoguer = "0.11.0"
 fastrand = "2.3.0"
-indicatif = "0.17.11"
 regex = "1.11.1"
 serde = { version = "1.0.219", features = ["derive"] }
-thiserror = "2.0.12"
 ureq = { version = "3.0.11", features = ["json", "platform-verifier"] }

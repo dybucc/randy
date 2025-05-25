@@ -8,14 +8,11 @@
     reason = "Temporary allow during development."
 )]
 
-use std::{borrow::Borrow as _, time::Duration};
-use std::{sync::LazyLock, thread::sleep};
+use std::{sync::LazyLock, thread::sleep, time::Duration};
 
 use anyhow::Result;
-use clap::Parser;
 use console::{pad_str, style, Term};
 use fastrand::Rng;
-use indicatif::{ProgressBar, ProgressStyle};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use ureq::Agent;
@@ -26,54 +23,19 @@ use crate::frame::prompt::nav_sliding_prompt;
 use crate::frame::random_prompt::nav_input_prompt;
 use crate::frame::{draw_menu, nav_menu};
 
-/// This struct holds information about the application when it comes to the command-line argument
-/// parser of choice, which is clap. It uses the derive attribute and multiple other attributes to
-/// set up the different commands, as that was found to be the simplest way of accomplishing what
-/// was set out to do.
-#[derive(Parser)]
-#[command(name = "randy", version, about)]
-#[command(next_line_help = true)]
-struct Cli {
-    /// The OpenRouter API key to provide for the AI-based responses.
-    ///
-    /// This argument is only required if the environment variable OPENROUTER_API_KEY is not set
-    /// with the corresponding API key. Otherwise, you will have to specify this option.
-    #[arg(long)]
-    #[arg(env = "OPENROUTER_API_KEY", value_name = "YOUR_API_KEY")]
-    api_key: String,
-    /// The model name to produce the response; DeepSeek's V3 by default.
-    ///
-    /// Models are processed by the string right below their public brand name in their respective
-    /// OpenRouter model page. If you want to set it to anything other than the default free model,
-    /// you will have to use that name.
-    #[arg(short, long, requires = "api_key", value_parser = verify_model)]
-    #[arg(env = "OPENROUTER_MODEL", value_name = "MODEL_NAME")]
-    model: Option<String>,
-}
-
-/// It makes up one of the fields the request to fetch models from the OpenRouter API requires. This
-/// structure doesn't support all of the mandatory and optional fields because the request is only
-/// interested in the model id.
-#[derive(Deserialize)]
-struct Data {
-    /// This field contains the name to be used on post requests in the model field for OpenRouter
-    /// POST API requests.
-    id: String,
-}
-
-/// This structure contains the main form of the response returned by an OpenRouter API request for
-/// the list of all models available for use in the API.
-#[derive(Deserialize)]
-struct ModelResponse {
-    /// This field contains the only part of the response that the OpenRouter API returns on their
-    /// list all models GET request. It is a list of objects that is abstracted as another struct to
-    /// deserialize.
-    data: Vec<Data>,
-}
+/// This static variable holds the message to use for the system prompt on the request builder to
+/// the chat completion request of the OpenRouter API. It is made static because the text is long
+/// and it is thus best initialized the first time it is used.
+static LLM_INPUT: LazyLock<&str> = LazyLock::new(|| {
+    "You will answer only to \"Correct\" or \"Incorrect.\" These correspond to either a\
+notification that a user got a number right in a number guessing game or not, respectively. Your\
+task is to, depending on whether you were notified they got it right, or not, to return a\
+cowboy-like answer to the user. Make it a short text. Include just your answer and nothing more.\
+Don't include emoji or otherwise non-verbal content."
+});
 
 /// This enum holds the variants to the final result of the user, to better transfer between
 /// different parts of the stateful variable that the result of the current game is.
-#[derive(Debug)]
 pub(crate) enum RandomResult {
     /// If the guess made by the user is correct, this variant will be used to report the status of
     /// the current game to other parts of the program.
@@ -83,97 +45,7 @@ pub(crate) enum RandomResult {
     Incorrect,
 }
 
-/// Initializes the game state and handles literally everything. This is a `main()` function of
-/// sorts though it is still called from main.rs.
-///
-/// This function specifically creates a new interface to the standard output, and a new rng
-/// instance to avoid calling the thread local generator every time the loop runs for another
-/// iteration.
-///
-/// # Errors
-///
-/// The function may return any one of the following errors:
-///
-/// - Regex::Error
-/// - io::Error
-/// - dialoguer::Error
-/// - randyrand::ResponseError
-pub fn run() -> Result<()> {
-    let term = Term::stdout();
-    let cli = Cli::parse();
-    let mut model = cli
-        .model
-        .unwrap_or_else(|| "deepseek/deepseek-chat-v3-0324:free".to_owned());
-    let mut main_menu = MainMenu::Play;
-    let mut options_menu = OptionsMenu::Model;
-    let ranged_re = Regex::new(r"\A\d+\.\.\d+\z")?;
-    let random_re = Regex::new(r"\A\d+\z")?;
-    let mut rng = Rng::new();
-
-    loop {
-        draw_menu(&term, &main_menu)?;
-
-        match nav_menu(&term, &mut main_menu)? {
-            MainMenuAction::Pass => continue,
-            MainMenuAction::Finish => break,
-            MainMenuAction::OptionsPage => options(&term, &mut options_menu, &mut model)?,
-            MainMenuAction::StartGame => {
-                let (guess, range_start, range_end) =
-                    nav_input_prompt(&term, (&ranged_re, &random_re))?;
-
-                let result = process_random((range_start, range_end), guess, &mut rng);
-                let message = process_request(&term, &model, &cli.api_key, result)?;
-
-                term.clear_screen()?;
-                let (rows, cols) = term.size();
-                for _ in 1..rows / 2 {
-                    term.write_line("")?;
-                }
-
-                let output = pad_str(&message, cols as usize, console::Alignment::Center, None);
-                term.write_line(&output)?;
-                sleep(Duration::from_secs(5));
-
-                break;
-            }
-        }
-    }
-
-    term.clear_screen()?;
-
-    Ok(())
-}
-
-/// This function renders the options menu.
-fn options(term: &Term, menu: &mut OptionsMenu, model: &mut String) -> Result<()> {
-    loop {
-        draw_menu(term, menu)?;
-
-        match nav_menu(term, menu)? {
-            OptionsMenuAction::ChangeModel => {
-                nav_sliding_prompt(term, model)?;
-            }
-            OptionsMenuAction::GoBack => break,
-            OptionsMenuAction::Pass => continue,
-        }
-    }
-
-    Ok(())
-}
-
-/// This functions takes the role of number generator, as it takes both inputs from the user per
-/// game, and both produces the number to be guessed within the given range, and matches the user
-/// input to such number.
-fn process_random(range: (usize, usize), input: usize, rng: &mut Rng) -> RandomResult {
-    let random = rng.usize(range.0..=range.1);
-
-    match input {
-        _ if input == random => RandomResult::Correct,
-        _ => RandomResult::Incorrect,
-    }
-}
-
-/// This variant holds information about the messages to send to the LLM in a chat completion
+/// This structure holds information about the messages to send to the LLM in a chat completion
 /// request to the OpenRouter API.
 #[derive(Serialize, Deserialize)]
 struct Messages {
@@ -205,14 +77,6 @@ struct Request {
     /// LLM.
     messages: Vec<Messages>,
 }
-
-static LLM_INPUT: LazyLock<&str> = LazyLock::new(|| {
-    "You will answer only to \"Correct\" or \"Incorrect.\" These correspond to either a\
-notification that a user got a number right in a number guessing game or not, respectively. Your\
-task is to, depending on whether you were notified they got it right, or not, to return a\
-cowboy-like answer to the user. Make it a short text. Include just your answer and nothing more.\
-Don't include emoji or otherwise non-verbal content."
-});
 
 impl Request {
     /// This function creates a new chat completion request body solely with the information
@@ -265,6 +129,93 @@ struct ResponseMessages {
     message: Messages,
 }
 
+/// Initializes the game state and handles literally everything. This is a `main()` function of
+/// sorts though it is still called from main.rs.
+///
+/// This function specifically creates a new interface to the standard output, and a new rng
+/// instance to avoid calling the thread local generator every time the loop runs for another
+/// iteration.
+///
+/// # Errors
+///
+/// The function may return any one of the following errors:
+///
+/// - [`Regex::Error`]
+/// - [`io::Error`]
+/// - [`dialoguer::Error`]
+/// - [`randyrand::ResponseError`]
+pub fn run(model: Option<String>, api_key: &str) -> Result<()> {
+    let term = Term::stdout();
+    let mut model = model.unwrap_or_else(|| "deepseek/deepseek-chat-v3-0324:free".to_owned());
+    let mut main_menu = MainMenu::Play;
+    let mut options_menu = OptionsMenu::Model;
+    let ranged_re = Regex::new(r"\A\d+\.\.\d+\z")?;
+    let random_re = Regex::new(r"\A\d+\z")?;
+    let mut rng = Rng::new();
+
+    loop {
+        draw_menu(&term, &main_menu)?;
+
+        match nav_menu(&term, &mut main_menu)? {
+            MainMenuAction::Pass => continue,
+            MainMenuAction::Finish => break,
+            MainMenuAction::OptionsPage => options(&term, &mut options_menu, &mut model)?,
+            MainMenuAction::StartGame => {
+                let (guess, range_start, range_end) =
+                    nav_input_prompt(&term, (&ranged_re, &random_re))?;
+
+                let result = process_random((range_start, range_end), guess, &mut rng);
+                let message = process_request(&term, &model, api_key, result)?;
+
+                term.clear_screen()?;
+                let (rows, cols) = term.size();
+                for _ in 1..rows / 2 {
+                    term.write_line("")?;
+                }
+
+                let output = pad_str(&message, cols as usize, console::Alignment::Center, None);
+                term.write_line(&output)?;
+                sleep(Duration::from_secs(5));
+
+                break;
+            }
+        }
+    }
+
+    term.clear_screen()?;
+
+    Ok(())
+}
+
+/// This function renders the options menu.
+fn options(term: &Term, menu: &mut OptionsMenu, model: &mut String) -> Result<()> {
+    loop {
+        draw_menu(term, menu)?;
+
+        match nav_menu(term, menu)? {
+            OptionsMenuAction::ChangeModel => {
+                nav_sliding_prompt(term, model)?;
+            }
+            OptionsMenuAction::GoBack => break,
+            OptionsMenuAction::Pass => continue,
+        }
+    }
+
+    Ok(())
+}
+
+/// This functions takes the role of number generator, as it takes both inputs from the user per
+/// game, and both produces the number to be guessed within the given range, and matches the user
+/// input to such number.
+fn process_random(range: (usize, usize), input: usize, rng: &mut Rng) -> RandomResult {
+    let random = rng.usize(range.0..=range.1);
+
+    match input {
+        _ if input == random => RandomResult::Correct,
+        _ => RandomResult::Incorrect,
+    }
+}
+
 /// This function builds a request body and processes a chat completion request to the OpenRouter
 /// API.
 fn process_request(
@@ -276,6 +227,11 @@ fn process_request(
     let request_body = Request::new(result, model);
     let agent = Agent::new_with_defaults();
     let (rows, cols) = term.size();
+    let (dot1, dot2, dot3) = (
+        format!("{}", style(".").bold()),
+        format!("{}", style("..").bold()),
+        format!("{}", style("...").bold()),
+    );
 
     term.clear_screen()?;
     term.hide_cursor()?;
@@ -284,17 +240,13 @@ fn process_request(
         term.write_line("")?;
     }
 
-    let output = pad_str(
-        "Processing",
-        cols as usize,
-        console::Alignment::Center,
-        None,
-    );
+    let output = format!("{}", style("Processing").bold());
+    let output = pad_str(&output, cols as usize, console::Alignment::Center, None);
     term.write_line(&output)?;
-    sleep(Duration::from_millis(300));
+    sleep(Duration::from_millis(100));
 
     loop {
-        let output = pad_str(".", cols as usize, console::Alignment::Center, None);
+        let output = pad_str(&dot1, cols as usize, console::Alignment::Center, None);
         term.write_line(&output)?;
 
         let response = agent
@@ -304,7 +256,7 @@ fn process_request(
 
         term.move_cursor_up(1)?;
         term.clear_line()?;
-        let output = pad_str("..", cols as usize, console::Alignment::Center, None);
+        let output = pad_str(&dot2, cols as usize, console::Alignment::Center, None);
         term.write_line(&output)?;
 
         match response {
@@ -326,130 +278,13 @@ fn process_request(
             }
         }
 
-        sleep(Duration::from_millis(300));
+        sleep(Duration::from_millis(100));
         term.move_cursor_up(1)?;
         term.clear_line()?;
-        let output = pad_str("...", cols as usize, console::Alignment::Center, None);
+        let output = pad_str(&dot3, cols as usize, console::Alignment::Center, None);
         term.write_line(&output)?;
-        sleep(Duration::from_millis(300));
+        sleep(Duration::from_millis(100));
         term.move_cursor_up(1)?;
         term.clear_line()?;
-    }
-}
-
-/// This function initializes the message to be used at the start of the program, as well as a few
-/// other fallible operations.
-///
-/// It loads the game title, sets the terminal name while running the program, and shows a spinner
-/// animation with a helper text to press a key to continue.
-fn init_message(term: &Term) -> Result<()> {
-    // maybe add a string that is more flashy; an ascii art generator should do
-    // if the ascii art is added, it will best be fit as a lazy static outside this function
-    const MSG: &str = "Welcome to the game of randy";
-    let msg = style(MSG).bold();
-
-    term.clear_screen()?;
-    term.set_title("randy");
-    term.write_line(&format!("{}", msg))?;
-
-    term.write_line("")?;
-    press_enter(term)?;
-    term.clear_screen()?;
-
-    Ok(())
-}
-
-/// This function reads a key from the user and considers if the key is the return key to finish a
-/// spinner animation.
-fn press_enter(term: &Term) -> Result<()> {
-    let progress = ProgressBar::new_spinner()
-        .with_prefix("Press return to continue")
-        .with_style(
-            ProgressStyle::default_spinner()
-                .tick_strings(&["", ".", "..", "...", ""])
-                .template("{prefix:^}{spinner:>}")?,
-        );
-
-    loop {
-        progress.enable_steady_tick(Duration::from_millis(500));
-        let input = term.read_key()?;
-
-        if input == console::Key::Enter {
-            break;
-        }
-    }
-
-    progress.finish_and_clear();
-
-    Ok(())
-}
-
-/// This function outputs a total score at the top right of the screen, with information on how many
-/// numbers the user has guessed right.
-fn score_display(term: &Term, score: &str) -> Result<()> {
-    let (_, cols) = term.size();
-    let score = format!("{}", style(format!("Score {score}")).bold().on_cyan());
-    let output = console::pad_str(&score, cols as usize, console::Alignment::Center, None);
-
-    term.write_line(output.borrow())?;
-
-    Ok(())
-}
-
-/// This function serves as a value parser for the command line argument parser in the `model`
-/// field. It basically makes a request to the OpenRouter API to retrieve the list of available
-/// models to use through their API and checks if the string passed by clap matches any one of the
-/// strings retrieved in the request.
-fn verify_model(string: &str) -> Result<String, String> {
-    let request = ureq::get("https://openrouter.ai/api/v1/models").call();
-
-    match request {
-        Ok(response) => {
-            let response: ModelResponse =
-                response.into_body().read_json().expect("response failed");
-            let mut output =
-                String::from("The requested model could not be found with the OpenRouter API.");
-
-            for Data { id } in response.data {
-                if id == string {
-                    string.clone_into(&mut output);
-                    return Ok(output);
-                }
-            }
-
-            Err(output)
-        }
-        Err(_) => Err(
-            "There's been an error checking the requested model with the OpenRouter API."
-                .to_owned(),
-        ),
-    }
-}
-
-#[expect(
-    clippy::arbitrary_source_item_ordering,
-    reason = "Tests are best left to the end of source files."
-)]
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn verifies_correct_model() {
-        let input = "deepseek/deepseek-chat-v3-0324:free";
-        let expect: Result<String, String> = Ok(input.to_owned());
-        let actual = verify_model(input);
-
-        assert_eq!(expect, actual);
-    }
-
-    #[test]
-    fn verifies_incorrect_model() {
-        let input = "deepseek";
-        let expect: Result<String, String> =
-            Err("The requested model could not be found with the OpenRouter API.".to_owned());
-        let actual = verify_model(input);
-
-        assert_eq!(expect, actual);
     }
 }

@@ -3,15 +3,22 @@
 //! It contains the `init()` function to initialize and start the game loop, as well as the game
 //! initialization message, some terminal configuration and the random number processor.
 
+#![expect(
+    clippy::arbitrary_source_item_ordering,
+    reason = "Temporary allow during development."
+)]
+
 use std::{borrow::Borrow as _, time::Duration};
+use std::{sync::LazyLock, thread::sleep};
 
 use anyhow::Result;
 use clap::Parser;
-use console::{style, Term};
+use console::{pad_str, style, Term};
 use fastrand::Rng;
 use indicatif::{ProgressBar, ProgressStyle};
 use regex::Regex;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
+use ureq::Agent;
 
 use crate::frame::main_menu::{MainMenu, MainMenuAction};
 use crate::frame::options::{OptionsMenu, OptionsMenuAction};
@@ -66,6 +73,7 @@ struct ModelResponse {
 
 /// This enum holds the variants to the final result of the user, to better transfer between
 /// different parts of the stateful variable that the result of the current game is.
+#[derive(Debug)]
 pub(crate) enum RandomResult {
     /// If the guess made by the user is correct, this variant will be used to report the status of
     /// the current game to other parts of the program.
@@ -114,6 +122,17 @@ pub fn run() -> Result<()> {
                     nav_input_prompt(&term, (&ranged_re, &random_re))?;
 
                 let result = process_random((range_start, range_end), guess, &mut rng);
+                let message = process_request(&term, &model, &cli.api_key, result)?;
+
+                term.clear_screen()?;
+                let (rows, cols) = term.size();
+                for _ in 1..rows / 2 {
+                    term.write_line("")?;
+                }
+
+                let output = pad_str(&message, cols as usize, console::Alignment::Center, None);
+                term.write_line(&output)?;
+                sleep(Duration::from_secs(5));
 
                 break;
             }
@@ -154,10 +173,168 @@ fn process_random(range: (usize, usize), input: usize, rng: &mut Rng) -> RandomR
     }
 }
 
+/// This variant holds information about the messages to send to the LLM in a chat completion
+/// request to the OpenRouter API.
+#[derive(Serialize, Deserialize)]
+struct Messages {
+    /// This field contains information about the content of the specific message in question.
+    content: String,
+    /// This field contains information about who is it that is supposed to be reporting the
+    /// [`message`] field.
+    role: Role,
+}
+
+impl Messages {
+    /// This function creates a new message based on a given role for the chat exchange and the
+    /// contents of the message in question.
+    fn new(role: Role, content: &str) -> Self {
+        Self {
+            content: content.to_owned(),
+            role,
+        }
+    }
+}
+
+/// This structure is the main way of serializing information about the data we are interested in
+/// for the chat completion request to the OpenRouter API.
+#[derive(Serialize)]
+struct Request {
+    /// This field contains information about the model to be used in the request.
+    model: String,
+    /// This field contains information about the sequence of messages to initially issue to the
+    /// LLM.
+    messages: Vec<Messages>,
+}
+
+static LLM_INPUT: LazyLock<&str> = LazyLock::new(|| {
+    "You will answer only to \"Correct\" or \"Incorrect.\" These correspond to either a\
+notification that a user got a number right in a number guessing game or not, respectively. Your\
+task is to, depending on whether you were notified they got it right, or not, to return a\
+cowboy-like answer to the user. Make it a short text. Include just your answer and nothing more.\
+Don't include emoji or otherwise non-verbal content."
+});
+
+impl Request {
+    /// This function creates a new chat completion request body solely with the information
+    /// required by the program.
+    fn new(guess: RandomResult, model: &str) -> Self {
+        match guess {
+            RandomResult::Correct => Self {
+                model: model.to_owned(),
+                messages: vec![
+                    Messages::new(Role::System, *LLM_INPUT),
+                    Messages::new(Role::User, "Correct"),
+                ],
+            },
+            RandomResult::Incorrect => Self {
+                model: model.to_owned(),
+                messages: vec![
+                    Messages::new(Role::System, *LLM_INPUT),
+                    Messages::new(Role::User, "Incorrect"),
+                ],
+            },
+        }
+    }
+}
+
+/// This enumeration represents the role in a chat exchange between a user and the LLM.
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+enum Role {
+    /// This variant represents the role of the LLM.
+    Assistant,
+    /// This variant represents the role of the system prompt.
+    System,
+    /// This variant represents the role of the user.
+    User,
+}
+
+/// This structure represents the response of a chat completion request to the OpenRouter API only
+/// with the values that the program needs.
+#[derive(Deserialize)]
+struct Response {
+    /// This field contains the vector of messages that the LLM has produced.
+    choices: Vec<ResponseMessages>,
+}
+
+/// This structure holds information about the one-level indented message containing the responses
+/// from the LLM.
+#[derive(Deserialize)]
+struct ResponseMessages {
+    /// This field contains the actual responses from the LLM.
+    message: Messages,
+}
+
 /// This function builds a request body and processes a chat completion request to the OpenRouter
 /// API.
-fn process_request(term: &Term, model: &str, result: RandomResult) {
-    let request_body = todo!();
+fn process_request(
+    term: &Term,
+    model: &str,
+    api_key: &str,
+    result: RandomResult,
+) -> Result<String> {
+    let request_body = Request::new(result, model);
+    let agent = Agent::new_with_defaults();
+    let (rows, cols) = term.size();
+
+    term.clear_screen()?;
+    term.hide_cursor()?;
+
+    for _ in 1..rows / 2 - 1 {
+        term.write_line("")?;
+    }
+
+    let output = pad_str(
+        "Processing",
+        cols as usize,
+        console::Alignment::Center,
+        None,
+    );
+    term.write_line(&output)?;
+    sleep(Duration::from_millis(300));
+
+    loop {
+        let output = pad_str(".", cols as usize, console::Alignment::Center, None);
+        term.write_line(&output)?;
+
+        let response = agent
+            .post("https://openrouter.ai/api/v1/chat/completions")
+            .header("Authorization", format!("Bearer {}", api_key))
+            .send_json(&request_body);
+
+        term.move_cursor_up(1)?;
+        term.clear_line()?;
+        let output = pad_str("..", cols as usize, console::Alignment::Center, None);
+        term.write_line(&output)?;
+
+        match response {
+            Ok(response) => {
+                let response: Response = response.into_body().read_json()?;
+                let output = &response
+                    .choices
+                    .last()
+                    .expect("empty vector")
+                    .message
+                    .content;
+
+                if !output.is_empty() {
+                    break Ok(output.to_owned());
+                }
+            }
+            Err(err) => {
+                break Err(err.into());
+            }
+        }
+
+        sleep(Duration::from_millis(300));
+        term.move_cursor_up(1)?;
+        term.clear_line()?;
+        let output = pad_str("...", cols as usize, console::Alignment::Center, None);
+        term.write_line(&output)?;
+        sleep(Duration::from_millis(300));
+        term.move_cursor_up(1)?;
+        term.clear_line()?;
+    }
 }
 
 /// This function initializes the message to be used at the start of the program, as well as a few

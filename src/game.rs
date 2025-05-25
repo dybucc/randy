@@ -59,6 +59,7 @@ impl Messages {
 
 /// This enum holds the variants to the final result of the user, to better transfer between
 /// different parts of the stateful variable that the result of the current game is.
+#[derive(Clone, Copy)]
 enum RandomResult {
     /// If the guess made by the user is correct, this variant will be used to report the status of
     /// the current game to other parts of the program.
@@ -131,11 +132,10 @@ enum Role {
 }
 
 /// Initializes the game state and handles literally everything. This is a `main()` function of
-/// sorts though it is still called from main.rs.
+/// sorts.
 ///
-/// This function specifically creates a new interface to the standard output, and a new rng
-/// instance to avoid calling the thread local generator every time the loop runs for another
-/// iteration.
+/// This function specifically creates a new interface to the two menus in the game; the main menu
+/// and the options menu.
 ///
 /// # Errors
 ///
@@ -143,15 +143,14 @@ enum Role {
 ///
 /// - [`Regex::Error`]
 /// - [`ureq::Error`]
-/// - [`randyrand::ResponseError`]
+/// - [`std::io::Error`]
 pub fn run(model: Option<String>, api_key: &str) -> Result<()> {
     let term = Term::stdout();
-    let mut model = model.unwrap_or_else(|| "featherless/qwerky-72b:free".to_owned());
+    let mut model = model.unwrap_or_else(|| "qwen/qwen3-32b:free".to_owned());
     let mut main_menu = MainMenu::Play;
     let mut options_menu = OptionsMenu::Model;
-    let ranged_re = Regex::new(r"\A\d+\.\.\d+\z")?;
-    let random_re = Regex::new(r"\A\d+\z")?;
-    let mut rng = Rng::new();
+
+    term.hide_cursor()?;
 
     loop {
         draw_menu(&term, &main_menu)?;
@@ -160,9 +159,7 @@ pub fn run(model: Option<String>, api_key: &str) -> Result<()> {
             MainMenuAction::Pass => continue,
             MainMenuAction::Finish => break,
             MainMenuAction::OptionsPage => options(&term, &mut options_menu, &mut model)?,
-            MainMenuAction::StartGame => {
-                init_game(&term, &ranged_re, &random_re, &mut rng, &model, api_key)?;
-            }
+            MainMenuAction::StartGame => init_game(&term, &model, api_key)?,
         }
     }
 
@@ -190,19 +187,23 @@ fn options(term: &Term, menu: &mut OptionsMenu, model: &mut String) -> Result<()
 
 /// This function initializes the game loop and processes all logic involved in the game itself
 /// until the user decides to exit it.
-fn init_game(
-    term: &Term,
-    ranged_re: &Regex,
-    random_re: &Regex,
-    rng: &mut Rng,
-    model: &str,
-    api_key: &str,
-) -> Result<()> {
-    loop {
-        let (guess, range_start, range_end) = nav_input_prompt(term, (ranged_re, random_re))?;
+fn init_game(term: &Term, model: &str, api_key: &str) -> Result<()> {
+    let ranged_re = Regex::new(r"\A\d+\.\.\d+\z")?;
+    let random_re = Regex::new(r"\A\d+\z")?;
+    let mut rng = Rng::new();
+    let mut score = 0;
 
-        let result = process_random((range_start, range_end), guess, rng);
+    loop {
+        let (guess, range_start, range_end) =
+            nav_input_prompt(term, (&ranged_re, &random_re), score)?;
+
+        let result = process_random((range_start, range_end), guess, &mut rng);
         let message = process_request(term, model, api_key, result)?;
+
+        match result {
+            RandomResult::Correct => score += 1,
+            RandomResult::Incorrect => {}
+        }
 
         term.clear_screen()?;
         let (rows, cols) = term.size();

@@ -47,6 +47,7 @@ fn draw_input_prompt(
     prompt_range: &Prompt,
     prompt_random: &Prompt,
     selected: Selected,
+    score: u32,
 ) -> Result<()> {
     let (rows, cols) = term.size();
     let upper_half_fill = rows / 2 - 2;
@@ -56,7 +57,6 @@ fn draw_input_prompt(
         term.write_line("")?;
     }
 
-    // select the highlighted/non-highlighted styles depending on which prompt is selected
     let output1;
     let output2;
     let output3;
@@ -145,9 +145,13 @@ fn draw_input_prompt(
     let output = pad_str(&output3, cols as usize, console::Alignment::Center, None);
     term.write_line(&output)?;
 
-    for _ in 1..lower_half_fill {
+    for _ in 1..lower_half_fill - 2 {
         term.write_line("")?;
     }
+
+    let binding = format!("{}", style(format!("Score {score}")).bold().on_cyan());
+    let output = pad_str(&binding, cols as usize, console::Alignment::Center, None);
+    term.write_line(&output)?;
 
     Ok(())
 }
@@ -157,6 +161,7 @@ fn draw_input_prompt(
 pub(crate) fn nav_input_prompt(
     term: &Term,
     validator: (&Regex, &Regex),
+    score: u32,
 ) -> Result<(usize, usize, usize)> {
     let mut prompt_range = Prompt::new("Input a range in the format n..m");
     let mut prompt_random = Prompt::new("Input a random number in the above range");
@@ -164,7 +169,7 @@ pub(crate) fn nav_input_prompt(
 
     loop {
         term.clear_screen()?;
-        draw_input_prompt(term, &prompt_range, &prompt_random, selected)?;
+        draw_input_prompt(term, &prompt_range, &prompt_random, selected, score)?;
 
         let key = term.read_key()?;
         match selected {
@@ -195,7 +200,7 @@ pub(crate) fn nav_input_prompt(
                 }
 
                 term.clear_screen()?;
-                draw_input_prompt(term, &prompt_range, &prompt_random, selected)?;
+                draw_input_prompt(term, &prompt_range, &prompt_random, selected, score)?;
             },
             Selected::RangePrompt if key == Key::ArrowUp => selected = Selected::Accept,
             Selected::RangePrompt if key == Key::ArrowDown => selected = Selected::RandomPrompt,
@@ -230,7 +235,7 @@ pub(crate) fn nav_input_prompt(
                 }
 
                 term.clear_screen()?;
-                draw_input_prompt(term, &prompt_range, &prompt_random, selected)?;
+                draw_input_prompt(term, &prompt_range, &prompt_random, selected, score)?;
             },
             Selected::RandomPrompt if key == Key::ArrowUp => selected = Selected::RangePrompt,
             Selected::RandomPrompt if key == Key::ArrowDown => selected = Selected::Accept,

@@ -21,13 +21,9 @@ use anyhow::Result;
 use clap::Parser;
 use serde::Deserialize;
 
-/// This struct holds information about the application when it comes to the command-line argument
-/// parser of choice, which is clap.
-///
-/// It uses the derive attribute and multiple other attributes to set up the different commands, as
-/// that was found to be the simplest way of accomplishing what was set out to do.
+/// Struct holding information relative to the command-line argument parser.
 #[derive(Parser)]
-#[command(name = "randy", version, about)]
+#[command(name = "randy", version, about, long_about = None)]
 #[command(next_line_help = true)]
 struct Cli {
     /// The OpenRouter API key to provide for the AI-based responses.
@@ -37,7 +33,7 @@ struct Cli {
     #[arg(long)]
     #[arg(env = "OPENROUTER_API_KEY", value_name = "YOUR_API_KEY")]
     api_key: String,
-    /// The model name to produce the response; Qwerky 72B by default.
+    /// The model name to produce the response; Qwen3 32B by default.
     ///
     /// Models are processed by the string right below their public brand name in their respective
     /// OpenRouter model page. If you want to set it to anything other than the default free model,

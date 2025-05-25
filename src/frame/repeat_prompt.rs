@@ -94,8 +94,6 @@ pub(crate) fn nav_repeat_prompt(term: &Term) -> Result<bool> {
         selected: PromptSelectable::Prompt,
     };
 
-    term.hide_cursor()?;
-
     loop {
         term.clear_screen()?;
         draw_repeat_prompt(term, &prompt)?;
@@ -115,14 +113,8 @@ pub(crate) fn nav_repeat_prompt(term: &Term) -> Result<bool> {
                 prompt.selected = PromptSelectable::Prompt;
             }
             Key::Enter if prompt.selected == PromptSelectable::Accept => match prompt.input {
-                Selectable::Yes => {
-                    term.show_cursor()?;
-                    break Ok(true);
-                }
-                Selectable::No => {
-                    term.show_cursor()?;
-                    break Ok(false);
-                }
+                Selectable::Yes => break Ok(true),
+                Selectable::No => break Ok(false),
             },
             _ => {}
         }

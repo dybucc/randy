@@ -1,7 +1,5 @@
 //! This module holds experimental attempts at a TUI for randy.
 
-#![expect(unused, reason = "Temporary allow during development")]
-
 pub(crate) mod main_menu;
 pub(crate) mod options;
 pub(crate) mod prompt;
@@ -9,7 +7,6 @@ pub(crate) mod random_prompt;
 
 use anyhow::Result;
 use console::{style, Key, Term};
-use std::fmt::Write as _;
 
 /// This trait implements methods for menus with selectable items.
 pub(crate) trait Selected
@@ -42,8 +39,6 @@ where
     T: Selected,
 {
     let (rows, cols) = term.size();
-    let left_half_cols = cols / 2;
-    let right_half_cols = cols - left_half_cols;
     let upper_half_rows = rows / 2;
     let lower_half_rows = rows - upper_half_rows;
     let upper_half_list = menu.list().len() / 2;
@@ -65,7 +60,7 @@ where
         };
 
         let output = console::pad_str(&content, cols as usize, console::Alignment::Center, None);
-        term.write_line(&output);
+        term.write_line(&output)?;
     }
 
     for _ in 1..lower_half_rows as usize - lower_half_list {

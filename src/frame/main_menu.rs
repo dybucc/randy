@@ -1,6 +1,6 @@
 //! This module contains experimental support for main menu rendering.
 
-use console::{Term, Key};
+use console::Key;
 
 use crate::frame::Selected;
 

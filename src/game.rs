@@ -5,7 +5,7 @@
 
 #![expect(
     clippy::arbitrary_source_item_ordering,
-    reason = "Temporary allow during development."
+    reason = "It's best if the run() function is kept before any functions it itself uses."
 )]
 
 use std::{sync::LazyLock, thread::sleep, time::Duration};
@@ -34,17 +34,6 @@ cowboy-like answer to the user. Make it a short text. Include just your answer a
 Don't include emoji or otherwise non-verbal content."
 });
 
-/// This enum holds the variants to the final result of the user, to better transfer between
-/// different parts of the stateful variable that the result of the current game is.
-pub(crate) enum RandomResult {
-    /// If the guess made by the user is correct, this variant will be used to report the status of
-    /// the current game to other parts of the program.
-    Correct,
-    /// If the guess made by the user is inccorrect, this variant will be used to report the status
-    /// of the current game to other parts of the program.
-    Incorrect,
-}
-
 /// This structure holds information about the messages to send to the LLM in a chat completion
 /// request to the OpenRouter API.
 #[derive(Serialize, Deserialize)]
@@ -67,15 +56,26 @@ impl Messages {
     }
 }
 
+/// This enum holds the variants to the final result of the user, to better transfer between
+/// different parts of the stateful variable that the result of the current game is.
+enum RandomResult {
+    /// If the guess made by the user is correct, this variant will be used to report the status of
+    /// the current game to other parts of the program.
+    Correct,
+    /// If the guess made by the user is inccorrect, this variant will be used to report the status
+    /// of the current game to other parts of the program.
+    Incorrect,
+}
+
 /// This structure is the main way of serializing information about the data we are interested in
 /// for the chat completion request to the OpenRouter API.
 #[derive(Serialize)]
 struct Request {
-    /// This field contains information about the model to be used in the request.
-    model: String,
     /// This field contains information about the sequence of messages to initially issue to the
     /// LLM.
     messages: Vec<Messages>,
+    /// This field contains information about the model to be used in the request.
+    model: String,
 }
 
 impl Request {
@@ -101,18 +101,6 @@ impl Request {
     }
 }
 
-/// This enumeration represents the role in a chat exchange between a user and the LLM.
-#[derive(Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-enum Role {
-    /// This variant represents the role of the LLM.
-    Assistant,
-    /// This variant represents the role of the system prompt.
-    System,
-    /// This variant represents the role of the user.
-    User,
-}
-
 /// This structure represents the response of a chat completion request to the OpenRouter API only
 /// with the values that the program needs.
 #[derive(Deserialize)]
@@ -129,6 +117,18 @@ struct ResponseMessages {
     message: Messages,
 }
 
+/// This enumeration represents the role in a chat exchange between a user and the LLM.
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+enum Role {
+    /// This variant represents the role of the LLM.
+    Assistant,
+    /// This variant represents the role of the system prompt.
+    System,
+    /// This variant represents the role of the user.
+    User,
+}
+
 /// Initializes the game state and handles literally everything. This is a `main()` function of
 /// sorts though it is still called from main.rs.
 ///
@@ -141,12 +141,11 @@ struct ResponseMessages {
 /// The function may return any one of the following errors:
 ///
 /// - [`Regex::Error`]
-/// - [`io::Error`]
-/// - [`dialoguer::Error`]
+/// - [`ureq::Error`]
 /// - [`randyrand::ResponseError`]
 pub fn run(model: Option<String>, api_key: &str) -> Result<()> {
     let term = Term::stdout();
-    let mut model = model.unwrap_or_else(|| "deepseek/deepseek-chat-v3-0324:free".to_owned());
+    let mut model = model.unwrap_or_else(|| "featherless/qwerky-72b:free".to_owned());
     let mut main_menu = MainMenu::Play;
     let mut options_menu = OptionsMenu::Model;
     let ranged_re = Regex::new(r"\A\d+\.\.\d+\z")?;

@@ -1,7 +1,5 @@
 //! This module enables experimental support for a prompt in which to enter two inputs.
 
-use std::borrow::BorrowMut;
-
 use anyhow::Result;
 use console::{pad_str, style, Key, Term};
 use regex::Regex;
@@ -148,7 +146,7 @@ fn draw_input_prompt(
     term.write_line(&output)?;
 
     for _ in 1..lower_half_fill {
-        term.write_line("");
+        term.write_line("")?;
     }
 
     Ok(())
@@ -175,7 +173,7 @@ pub(crate) fn nav_input_prompt(
                 match input {
                     Key::Escape => {
                         if validator.0.is_match(&prompt_range.prompt) {
-                            let (start, mut end) = prompt_range.prompt.split_at(
+                            let (start, end) = prompt_range.prompt.split_at(
                                 prompt_range.prompt.find("..").expect("pattern not found"),
                             );
                             let end: String = end.chars().rev().collect();
@@ -208,7 +206,7 @@ pub(crate) fn nav_input_prompt(
                         if validator.1.is_match(&prompt_random.prompt)
                             && !prompt_range.prompt.is_empty()
                         {
-                            let (start, mut end) = prompt_range.prompt.split_at(
+                            let (start, end) = prompt_range.prompt.split_at(
                                 prompt_range.prompt.find("..").expect("pattern not found"),
                             );
                             let end: String = end.chars().rev().collect();
@@ -238,7 +236,7 @@ pub(crate) fn nav_input_prompt(
             Selected::RandomPrompt if key == Key::ArrowDown => selected = Selected::Accept,
             Selected::Accept if key == Key::Enter => {
                 if !prompt_random.prompt.is_empty() && !prompt_range.prompt.is_empty() {
-                    let (start, mut end) = prompt_range
+                    let (start, end) = prompt_range
                         .prompt
                         .split_at(prompt_range.prompt.find("..").expect("pattern not found"));
                     let end: String = end.chars().rev().collect();

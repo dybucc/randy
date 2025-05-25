@@ -1,7 +1,5 @@
 //! This module enables experimental support for basic prompts on fixed frames.
 
-use std::{borrow::Borrow as _, ops::Rem};
-
 use anyhow::Result;
 use console::{style, Key, Term};
 use serde::Deserialize;

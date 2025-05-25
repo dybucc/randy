@@ -1,6 +1,6 @@
 //! This module holds experimental support for rendering an options menu.
 
-use console::{Key, Term};
+use console::Key;
 
 use crate::frame::Selected;
 

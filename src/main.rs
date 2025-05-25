@@ -37,7 +37,7 @@ struct Cli {
     #[arg(long)]
     #[arg(env = "OPENROUTER_API_KEY", value_name = "YOUR_API_KEY")]
     api_key: String,
-    /// The model name to produce the response; DeepSeek's V3 by default.
+    /// The model name to produce the response; Querky 72B by default.
     ///
     /// Models are processed by the string right below their public brand name in their respective
     /// OpenRouter model page. If you want to set it to anything other than the default free model,

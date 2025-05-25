@@ -3,10 +3,12 @@
 //!
 //! The starting point of the library is the game.rs file, which contains the main game loop.
 
-// #![expect(unused, reason = "Temporary allow during development.")]
+#![expect(
+    unused_crate_dependencies,
+    reason = "clap is not used in the library crate, but it is used in the binary crate."
+)]
 
+mod frame;
 mod game;
-mod input;
-mod messages;
 
-pub use game::init;
+pub use game::run;

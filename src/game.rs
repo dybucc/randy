@@ -21,6 +21,7 @@ use crate::frame::main_menu::{MainMenu, MainMenuAction};
 use crate::frame::options::{OptionsMenu, OptionsMenuAction};
 use crate::frame::prompt::nav_sliding_prompt;
 use crate::frame::random_prompt::nav_input_prompt;
+use crate::frame::repeat_prompt::nav_repeat_prompt;
 use crate::frame::{draw_menu, nav_menu};
 
 /// This static variable holds the message to use for the system prompt on the request builder to
@@ -160,23 +161,27 @@ pub fn run(model: Option<String>, api_key: &str) -> Result<()> {
             MainMenuAction::Finish => break,
             MainMenuAction::OptionsPage => options(&term, &mut options_menu, &mut model)?,
             MainMenuAction::StartGame => {
-                let (guess, range_start, range_end) =
-                    nav_input_prompt(&term, (&ranged_re, &random_re))?;
+                loop {
+                    let (guess, range_start, range_end) =
+                        nav_input_prompt(&term, (&ranged_re, &random_re))?;
 
-                let result = process_random((range_start, range_end), guess, &mut rng);
-                let message = process_request(&term, &model, api_key, result)?;
+                    let result = process_random((range_start, range_end), guess, &mut rng);
+                    let message = process_request(&term, &model, api_key, result)?;
 
-                term.clear_screen()?;
-                let (rows, cols) = term.size();
-                for _ in 1..rows / 2 {
-                    term.write_line("")?;
+                    term.clear_screen()?;
+                    let (rows, cols) = term.size();
+                    for _ in 1..rows / 2 {
+                        term.write_line("")?;
+                    }
+
+                    let output = pad_str(&message, cols as usize, console::Alignment::Center, None);
+                    term.write_line(&output)?;
+                    sleep(Duration::from_secs(5));
+
+                    if !nav_repeat_prompt(&term)? {
+                        break;
+                    }
                 }
-
-                let output = pad_str(&message, cols as usize, console::Alignment::Center, None);
-                term.write_line(&output)?;
-                sleep(Duration::from_secs(5));
-
-                break;
             }
         }
     }

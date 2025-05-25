@@ -37,7 +37,7 @@ struct Cli {
     #[arg(long)]
     #[arg(env = "OPENROUTER_API_KEY", value_name = "YOUR_API_KEY")]
     api_key: String,
-    /// The model name to produce the response; Querky 72B by default.
+    /// The model name to produce the response; Qwerky 72B by default.
     ///
     /// Models are processed by the string right below their public brand name in their respective
     /// OpenRouter model page. If you want to set it to anything other than the default free model,
@@ -78,7 +78,7 @@ fn main() -> Result<()> {
 /// field. It basically makes a request to the OpenRouter API to retrieve the list of available
 /// models to use through their API and checks if the string passed by clap matches any one of the
 /// strings retrieved in the request.
-pub(crate) fn verify_model(string: &str) -> Result<String, String> {
+fn verify_model(string: &str) -> Result<String, String> {
     let request = ureq::get("https://openrouter.ai/api/v1/models").call();
 
     match request {
